@@ -64,6 +64,8 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void ShowDeadUI();
 
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void ShowAliveUI();
 
 // GameOver
 public:

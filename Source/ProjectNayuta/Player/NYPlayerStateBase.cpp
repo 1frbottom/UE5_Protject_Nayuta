@@ -16,7 +16,7 @@ void ANYPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(ANYPlayerStateBase, CurrState);
+    DOREPLIFETIME(ANYPlayerStateBase, CurrPhase);
 
     DOREPLIFETIME(ANYPlayerStateBase, CurrExp);
     DOREPLIFETIME(ANYPlayerStateBase, MaxExp);
@@ -30,24 +30,40 @@ void ANYPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 }
 
-void ANYPlayerStateBase::SetPlayerState(ENYPlayerState NewState)
+void ANYPlayerStateBase::SetPlayerPhase(ENYPlayerPhase NewPhase)
 {
     if (!HasAuthority())
         return;
 
-    CurrState = NewState;
+    CurrPhase = NewPhase;
 
     // 리슨서버용
-    OnRep_CurrState();
+    OnRep_CurrPhase();
 }
 
-void ANYPlayerStateBase::OnRep_CurrState()
+void ANYPlayerStateBase::OnRep_CurrPhase()
 {
-    if (CurrState == ENYPlayerState::Dead)
+    if (CurrPhase == ENYPlayerPhase::Alive)
     {
-        if (ANYCharacterPlayer* Pwn_ref = Cast<ANYCharacterPlayer>(GetPawn()))
+        if (ANYCharacterPlayer* Character_ref = Cast<ANYCharacterPlayer>(GetPawn()))
         {
-            Pwn_ref->Die();
+            Character_ref->Revive();
+        }
+
+        if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+        {
+            if (PC->IsLocalPlayerController())
+            {
+                PC->ShowAliveUI();
+            }
+        }
+
+    }
+    else if (CurrPhase == ENYPlayerPhase::Dead)
+    {
+        if (ANYCharacterPlayer* Character_ref = Cast<ANYCharacterPlayer>(GetPawn()))
+        {
+            Character_ref->Die();
         }
 
         // WBP_Dead
@@ -61,7 +77,7 @@ void ANYPlayerStateBase::OnRep_CurrState()
 
 
     }
-    else if (CurrState == ENYPlayerState::Rewarding)
+    else if (CurrPhase == ENYPlayerPhase::Rewarding)
     {
 
     }
@@ -72,7 +88,7 @@ void ANYPlayerStateBase::OnRep_CurrState()
 
 void ANYPlayerStateBase::ApplyDamage(float DamageAmount)
 {
-    if (!HasAuthority() || !(CurrState == ENYPlayerState::Alive))
+    if (!HasAuthority() || !(CurrPhase == ENYPlayerPhase::Alive))
         return;
 
     CurrHp = FMath::Clamp(CurrHp - DamageAmount, 0.0f, MaxHP);
@@ -83,8 +99,7 @@ void ANYPlayerStateBase::ApplyDamage(float DamageAmount)
     // 캐릭터 사망
     if (CurrHp <= 0.0f)
     {
-        CurrState = ENYPlayerState::Dead;
-        OnRep_CurrState();
+        SetPlayerPhase(ENYPlayerPhase::Dead);
 
         // GameMode
         if (ANYGameMode* GM = GetWorld()->GetAuthGameMode<ANYGameMode>())
@@ -107,10 +122,21 @@ void ANYPlayerStateBase::SetCurrHp(float InHp)
 
 void ANYPlayerStateBase::OnRep_CurrHp()
 {
-    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    // for party hpbar ui
+    if (ANYPlayerControllerStage* LocalPC = Cast<ANYPlayerControllerStage>(GetWorld()->GetFirstPlayerController()))
     {
         float HpPercent = (MaxHP > 0.0f) ? (CurrHp / MaxHP) : 0.0f;
-        PC->UpdatePlayerHpUI(HpPercent);
+
+        // 내 PC면 내 Hpbar 업데이트
+        if (LocalPC->PlayerState == this)
+        {
+            LocalPC->UpdatePlayerHpUI(HpPercent);
+        }
+        else
+        {
+            
+
+        }
 
         // debug
         GEngine->AddOnScreenDebugMessage(
@@ -125,6 +151,13 @@ void ANYPlayerStateBase::AddExp(int32 InExp)
     if (!HasAuthority())
         return;
 
+    // temp expception
+    if (MaxExp <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ANYPlayerStateBase] MaxExp is 0 or less! Setting to default 100 to prevent infinite loop."));
+        MaxExp = 100;
+    }
+
     CurrExp += InExp;
 
     while (CurrExp >= MaxExp)
@@ -134,6 +167,8 @@ void ANYPlayerStateBase::AddExp(int32 InExp)
         // 다음 경험치통 DT에서 읽어오기
 
     }
+
+    OnRep_CurrExp();
 }
 
 void ANYPlayerStateBase::OnRep_CurrExp()
@@ -160,7 +195,7 @@ void ANYPlayerStateBase::OnRep_MoveSpeed()
     {
         if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(Pwn_ref))
         {
-            Character->GetCharacterMovement()->MaxWalkSpeed = MoveSpeed; 
+            Character->GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
         }
     }
 }

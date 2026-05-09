@@ -178,7 +178,7 @@ void ANYCharacterPlayer::Look(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 {
-    if (!PS_ref && PS_ref->GetPlayerState() != ENYPlayerState::Alive)
+    if (!PS_ref && PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
         return;
 
     FVector2D MovementVector = Value.Get<FVector2D>();
@@ -253,9 +253,11 @@ void ANYCharacterPlayer::Die()
 
 void ANYCharacterPlayer::Revive()
 {
-    // Collision enable
+    GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
-    // Possess
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+    // stop dead animation?
 
 }
 

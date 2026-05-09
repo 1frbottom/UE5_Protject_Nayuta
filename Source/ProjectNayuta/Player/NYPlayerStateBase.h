@@ -9,7 +9,7 @@
 
 
 UENUM(BlueprintType)
-enum class ENYPlayerState : uint8
+enum class ENYPlayerPhase : uint8
 {
 	Alive,
 	Dead,
@@ -30,17 +30,17 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 
-	// State
+	// Phase
 public:
-	FORCEINLINE ENYPlayerState GetPlayerState() { return CurrState; };
-	void SetPlayerState(ENYPlayerState NewState);
+	FORCEINLINE ENYPlayerPhase GetPlayerPhase() { return CurrPhase; };
+	void SetPlayerPhase(ENYPlayerPhase NewPhase);
 
 protected:
-	UPROPERTY(ReplicatedUsing = OnRep_CurrState)
-	ENYPlayerState CurrState = ENYPlayerState::Alive;
+	UPROPERTY(ReplicatedUsing = OnRep_CurrPhase)
+	ENYPlayerPhase CurrPhase = ENYPlayerPhase::Alive;
 
 	UFUNCTION()
-	void OnRep_CurrState();
+	void OnRep_CurrPhase();
 
 
 	// Level
@@ -85,6 +85,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_MoveSpeed();
+
 
 	// Exp
 public:

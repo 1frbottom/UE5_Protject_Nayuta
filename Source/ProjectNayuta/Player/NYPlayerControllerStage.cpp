@@ -71,7 +71,7 @@ void ANYPlayerControllerStage::TogglePause()
 void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeIndex)
 {
     ANYPlayerStateBase* PS = Cast<ANYPlayerStateBase>(PlayerState);
-    if (PS->GetPlayerState() != ENYPlayerState::Rewarding)
+    if (PS->GetPlayerPhase() != ENYPlayerPhase::Rewarding)
         return;
 
     if (ANYGameMode* GM = Cast<ANYGameMode>(GetWorld()->GetAuthGameMode()))
@@ -83,7 +83,7 @@ void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeI
 void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
 {
     ANYPlayerStateBase* PS = Cast<ANYPlayerStateBase>(PlayerState);
-    if (PS->GetPlayerState() != ENYPlayerState::Dead)
+    if (PS->GetPlayerPhase() != ENYPlayerPhase::Dead)
         return;
 
     if (ANYGameMode* GM = GetWorld()->GetAuthGameMode<ANYGameMode>())

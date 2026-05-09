@@ -42,6 +42,37 @@ void ANYGameMode::PostLogin(APlayerController* NewPlayer)
 
 }
 
+void ANYGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+
+	if (GetNumPlayers() <= 0)
+		return;
+
+	ANYGameStateBase* GS = GetGameState<ANYGameStateBase>();
+	if (!GS)
+		return;
+
+	// 보상 페이즈에서 누군가 나갔을 때 Softlock 방지
+	if (GS->GetGamePhase() == ENYGamePhase::Rewarding)
+	{
+		// 나간 사람 때문에 남은 인원(GetNumPlayers)이 보상 완료 인원과 같아지거나 작아졌다면 즉시 다음 웨이브 시작
+		if (RewardedPlayerCnt >= GetNumPlayers())
+		{
+			StartNextWave();
+		}
+	}
+
+	// 재시작 투표 대기 중일 때 Softlock 방지
+	if (GS->GetGamePhase() == ENYGamePhase::GameOver)
+	{
+		if (RetryVoteCount >= GetNumPlayers())
+		{
+			GetWorld()->ServerTravel("?Restart", false);
+		}
+	}
+}
+
 void ANYGameMode::OnEnemyKilled()
 {
 	CurrKillCnt++;
@@ -101,15 +132,21 @@ void ANYGameMode::StartNextWave()
 		GS->ReplicatedTargetKillCnt = TargetKillCnt;
 		GS->ReplicatedKillCnt = 0;
 
+		AlivePlayerCnt = 0;
+
+		// Revive
 		for (APlayerState* PS : GS->PlayerArray)
 		{
 			if (ANYPlayerStateBase* MyPS = Cast<ANYPlayerStateBase>(PS))
 			{
-				MyPS->SetPlayerState(ENYPlayerState::Alive);
+				if (MyPS->GetPawn() != nullptr)
+				{
+					MyPS->SetPlayerPhase(ENYPlayerPhase::Alive);
 
-				// TODO : revive
+					MyPS->SetCurrHp(MyPS->GetMaxHp());
 
-
+					AlivePlayerCnt++;
+				}
 			}
 		}
 	}
@@ -168,7 +205,7 @@ void ANYGameMode::StartRewardPhase()
 			ANYPlayerStateBase* MyPS = Cast<ANYPlayerStateBase>(PS);
 			if (MyPS)
 			{
-				MyPS->SetPlayerState(ENYPlayerState::Rewarding);
+				MyPS->SetPlayerPhase(ENYPlayerPhase::Rewarding);
 			}
 		}
 	}

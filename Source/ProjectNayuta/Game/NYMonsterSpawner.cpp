@@ -68,7 +68,7 @@ void ANYMonsterSpawner::SpawnMonsterRoutine()
         {
             ANYPlayerStateBase* MyPS = Cast<ANYPlayerStateBase>(PS);
 
-            if (MyPS && MyPS->GetPlayerState() == ENYPlayerState::Alive)
+            if (MyPS && MyPS->GetPlayerPhase() == ENYPlayerPhase::Alive)
                 if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(MyPS->GetPawn()))
                 {
                     AlivePlayers.Add(Character);
