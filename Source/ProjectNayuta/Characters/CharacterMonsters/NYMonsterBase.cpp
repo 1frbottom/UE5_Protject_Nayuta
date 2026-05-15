@@ -13,7 +13,7 @@
 
 #include "UI/NYHpBarWidgetMonster.h"
 
-#include "Game/NYGameMode.h"
+#include "Game/NYGameModeStage.h"
 
 
 
@@ -121,7 +121,7 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
         // TODO : 경험치 보석 스폰 로직 호출
         
 
-        if (ANYGameMode* GM = Cast<ANYGameMode>(GetWorld()->GetAuthGameMode()))
+        if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
         {
             GM->OnEnemyKilled();
         }

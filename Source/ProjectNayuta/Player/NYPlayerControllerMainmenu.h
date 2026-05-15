@@ -14,8 +14,18 @@ class PROJECTNAYUTA_API ANYPlayerControllerMainmenu : public ANYPlayerController
 {
 	GENERATED_BODY()
 	
-protected:
+public:
 	virtual void BeginPlay() override;
+
+
+
+// Multiplay
+public:
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Server")
+	void Server_ToggleReady();
+
+protected:
+
 
 
 

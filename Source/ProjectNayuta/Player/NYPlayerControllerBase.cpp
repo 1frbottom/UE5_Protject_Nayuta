@@ -11,6 +11,8 @@
 
 ANYPlayerControllerBase::ANYPlayerControllerBase()
 {
+    bReplicates = true;
+
 
 }
 

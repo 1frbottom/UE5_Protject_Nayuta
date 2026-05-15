@@ -5,6 +5,8 @@
 
 #include "ProjectNayuta.h"
 
+#include "Engine/OverlapResult.h"
+
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -16,16 +18,15 @@
 #include "Net/UnrealNetwork.h"      // DOREPLIFETIME
 
 #include "Kismet/GameplayStatics.h"
+
+#include "Game/NYGameModeStage.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
-#include "Engine/OverlapResult.h"
+
+#include "Player/NYPlayerControllerStage.h"
+#include "Player/NYPlayerStateStage.h"
 
 #include "Weapons/NYAttackBase.h"
 #include "Weapons/NYWeaponComponent.h"
-
-#include "Player/NYPlayerControllerStage.h"
-#include "Player/NYPlayerStateBase.h"
-
-#include "Game/NYGameMode.h"
 
 
 
@@ -123,7 +124,7 @@ void ANYCharacterPlayer::OnRep_PlayerState()
 
 void ANYCharacterPlayer::InitPlayerState()
 {
-    PS_ref = GetPlayerState<ANYPlayerStateBase>();
+    PS_ref = GetPlayerState<ANYPlayerStateStage>();
 
     if (PS_ref)
     {

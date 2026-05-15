@@ -7,8 +7,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "Blueprint/UserWidget.h"
 
-#include "Game/NYGameMode.h"
-#include "Player/NYPlayerStateBase.h"
+#include "Game/NYGameModeStage.h"
+#include "Player/NYPlayerStateStage.h"
 
 
 
@@ -70,11 +70,11 @@ void ANYPlayerControllerStage::TogglePause()
 
 void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeIndex)
 {
-    ANYPlayerStateBase* PS = Cast<ANYPlayerStateBase>(PlayerState);
+    ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
     if (PS->GetPlayerPhase() != ENYPlayerPhase::Rewarding)
         return;
 
-    if (ANYGameMode* GM = Cast<ANYGameMode>(GetWorld()->GetAuthGameMode()))
+    if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
     {
         GM->OnPlayerRewarded();
     }
@@ -82,12 +82,13 @@ void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeI
 
 void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
 {
-    ANYPlayerStateBase* PS = Cast<ANYPlayerStateBase>(PlayerState);
+    ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
     if (PS->GetPlayerPhase() != ENYPlayerPhase::Dead)
         return;
 
-    if (ANYGameMode* GM = GetWorld()->GetAuthGameMode<ANYGameMode>())
+    if (ANYGameModeStage* GM = GetWorld()->GetAuthGameMode<ANYGameModeStage>())
     {
         GM->AddRetryVote();
     }
 }
+

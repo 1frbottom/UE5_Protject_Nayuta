@@ -1,40 +1,41 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Game/NYGameMode.h"
+
+#include "Game/NYGameModeStage.h"
 
 #include "Kismet/GameplayStatics.h"
 
 #include "Player/NYPlayerControllerStage.h"
-#include "Player/NYPlayerStateBase.h"
+#include "Player/NYPlayerStateStage.h"
 
-#include "Game/NYGameStateBase.h"
+#include "Game/NYGameStateStage.h"
 #include "Game/NYMonsterSpawner.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
 
 
-ANYGameMode::ANYGameMode()
+ANYGameModeStage::ANYGameModeStage()
 {
 
 
 
 }
 
-void ANYGameMode::BeginPlay()
+void ANYGameModeStage::BeginPlay()
 {
 	Super::BeginPlay();
 
 	// GS->SetGamePhase(ENYGamePhase::Waiting);
-	
+
 
 	// TODO : 멀티플레이 동기화를 위해 일정 시간 대기 후 시작하도록 수정 필요
-	
+
 
 	StartNextWave();
 }
 
-void ANYGameMode::PostLogin(APlayerController* NewPlayer)
+void ANYGameModeStage::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
@@ -42,14 +43,14 @@ void ANYGameMode::PostLogin(APlayerController* NewPlayer)
 
 }
 
-void ANYGameMode::Logout(AController* Exiting)
+void ANYGameModeStage::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
 
 	if (GetNumPlayers() <= 0)
 		return;
 
-	ANYGameStateBase* GS = GetGameState<ANYGameStateBase>();
+	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
 	if (!GS)
 		return;
 
@@ -73,12 +74,12 @@ void ANYGameMode::Logout(AController* Exiting)
 	}
 }
 
-void ANYGameMode::OnEnemyKilled()
+void ANYGameModeStage::OnEnemyKilled()
 {
 	CurrKillCnt++;
 
 	// TODO : 경험치, 골드
-	
+
 
 	if (CurrKillCnt >= TargetKillCnt)
 	{
@@ -86,7 +87,7 @@ void ANYGameMode::OnEnemyKilled()
 	}
 }
 
-void ANYGameMode::StartNextWave()
+void ANYGameModeStage::StartNextWave()
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("StartNextWave called! wave : %d"), CurrWave + 1));
 
@@ -126,7 +127,7 @@ void ANYGameMode::StartNextWave()
 		}
 	}
 
-	if (ANYGameStateBase* GS = GetGameState<ANYGameStateBase>())
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
 	{
 		GS->SetGamePhase(ENYGamePhase::Playing);
 		GS->ReplicatedTargetKillCnt = TargetKillCnt;
@@ -137,7 +138,7 @@ void ANYGameMode::StartNextWave()
 		// Revive
 		for (APlayerState* PS : GS->PlayerArray)
 		{
-			if (ANYPlayerStateBase* MyPS = Cast<ANYPlayerStateBase>(PS))
+			if (ANYPlayerStateStage* MyPS = Cast<ANYPlayerStateStage>(PS))
 			{
 				if (MyPS->GetPawn() != nullptr)
 				{
@@ -156,7 +157,7 @@ void ANYGameMode::StartNextWave()
 
 }
 
-void ANYGameMode::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
+void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 {
 	AlivePlayerCnt--;
 
@@ -168,10 +169,10 @@ void ANYGameMode::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 	}
 }
 
-void ANYGameMode::GameOver()
+void ANYGameModeStage::GameOver()
 {
 	// update Game Phase 
-	ANYGameStateBase* GS = GetGameState<ANYGameStateBase>();
+	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
 	if (GS)
 		GS->SetGamePhase(ENYGamePhase::GameOver);
 
@@ -180,10 +181,10 @@ void ANYGameMode::GameOver()
 
 }
 
-void ANYGameMode::StartRewardPhase()
+void ANYGameModeStage::StartRewardPhase()
 {
 	SetSpawnersActive(false);
-	
+
 	// TODO : 게임을 멈추던지, 무적으로 만들던지, 진행 멈춰야함, 일단 아래처럼 해놓긴 했는데 뭔가 별로같음
 	TArray<AActor*> AliveMonsters;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANYMonsterBase::StaticClass(), AliveMonsters);
@@ -194,7 +195,7 @@ void ANYGameMode::StartRewardPhase()
 		}
 
 	// GameState
-	ANYGameStateBase* GS = GetGameState<ANYGameStateBase>();
+	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
 	if (GS)
 	{
 		GS->SetGamePhase(ENYGamePhase::Rewarding);
@@ -202,7 +203,7 @@ void ANYGameMode::StartRewardPhase()
 		// PlayerStates
 		for (APlayerState* PS : GS->PlayerArray)
 		{
-			ANYPlayerStateBase* MyPS = Cast<ANYPlayerStateBase>(PS);
+			ANYPlayerStateStage* MyPS = Cast<ANYPlayerStateStage>(PS);
 			if (MyPS)
 			{
 				MyPS->SetPlayerPhase(ENYPlayerPhase::Rewarding);
@@ -210,7 +211,7 @@ void ANYGameMode::StartRewardPhase()
 		}
 	}
 
-	
+
 
 	RewardedPlayerCnt = 0;
 
@@ -219,7 +220,7 @@ void ANYGameMode::StartRewardPhase()
 
 }
 
-void ANYGameMode::OnPlayerRewarded()
+void ANYGameModeStage::OnPlayerRewarded()
 {
 	// TODO : 플레이어 선택 받아서 적용
 
@@ -232,12 +233,12 @@ void ANYGameMode::OnPlayerRewarded()
 	GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("reward clicked! current : %d / needed : %d"), RewardedPlayerCnt, GetNumPlayers()));
 }
 
-void ANYGameMode::AddRetryVote()
+void ANYGameModeStage::AddRetryVote()
 {
 	RetryVoteCount++;
 
 	// TODO : GameState에 현재 투표수 동기화, UI update
-	if (ANYGameStateBase* GS = GetGameState<ANYGameStateBase>())
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
 	{
 
 
@@ -251,7 +252,7 @@ void ANYGameMode::AddRetryVote()
 
 }
 
-void ANYGameMode::RegisterSpawner(ANYMonsterSpawner* Spawner)
+void ANYGameModeStage::RegisterSpawner(ANYMonsterSpawner* Spawner)
 {
 	if (Spawner && !ActiveSpawners.Contains(Spawner))
 	{
@@ -259,7 +260,7 @@ void ANYGameMode::RegisterSpawner(ANYMonsterSpawner* Spawner)
 	}
 }
 
-void ANYGameMode::SetSpawnersActive(bool bActive)
+void ANYGameModeStage::SetSpawnersActive(bool bActive)
 {
 	for (ANYMonsterSpawner* Spawner : ActiveSpawners)
 		if (Spawner)

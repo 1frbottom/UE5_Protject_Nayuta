@@ -6,9 +6,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "Math/UnrealMathUtility.h"
 
-#include "Game/NYGameMode.h"
-#include "Game/NYGameStateBase.h"
-#include "Player/NYPlayerStateBase.h"
+#include "Game/NYGameModeStage.h"
+#include "Game/NYGameStateStage.h"
+
+#include "Player/NYPlayerStateStage.h"
+
 #include "Characters/CharacterPlayers/NYCharacterPlayer.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
@@ -28,7 +30,7 @@ void ANYMonsterSpawner::BeginPlay()
 
     if (HasAuthority() && MonsterClass != nullptr)
     {
-        if (ANYGameMode* GM = Cast<ANYGameMode>(GetWorld()->GetAuthGameMode()))
+        if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
         {
             GM->RegisterSpawner(this);
         }
@@ -66,7 +68,7 @@ void ANYMonsterSpawner::SpawnMonsterRoutine()
     if (ANYGameStateBase* GS = GetWorld()->GetGameState<ANYGameStateBase>())
         for (APlayerState* PS : GS->PlayerArray)
         {
-            ANYPlayerStateBase* MyPS = Cast<ANYPlayerStateBase>(PS);
+            ANYPlayerStateStage* MyPS = Cast<ANYPlayerStateStage>(PS);
 
             if (MyPS && MyPS->GetPlayerPhase() == ENYPlayerPhase::Alive)
                 if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(MyPS->GetPawn()))

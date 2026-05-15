@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-
 #include "InputActionValue.h"
 
 #include "NYCharacterPlayer.generated.h"
@@ -17,7 +16,6 @@ class UInputComponent;
 class UInputMappingContext;
 class UInputAction;
 class UNYWeaponComponent;
-class ANYPlayerControllerStage;
 
 UCLASS()
 class PROJECTNAYUTA_API ANYCharacterPlayer : public ACharacter
@@ -46,7 +44,7 @@ public:
 // PlayerState
 private:
 	UPROPERTY(Transient)
-	TObjectPtr<class ANYPlayerStateBase> PS_ref;
+	TObjectPtr<class ANYPlayerStateStage> PS_ref;
 
 	virtual void OnRep_PlayerState() override;
 

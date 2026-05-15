@@ -3,10 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "Game/NYGameModeBase.h"
 #include "Engine/DataTable.h"
 
-#include "NYGameMode.generated.h"
+#include "NYGameModeStage.generated.h"
 
 
 
@@ -28,21 +28,21 @@ struct FNYWaveDataRow : public FTableRowBase
 };
 
 /**
- *
+ * 
  */
 UCLASS()
-class PROJECTNAYUTA_API ANYGameMode : public AGameModeBase
+class PROJECTNAYUTA_API ANYGameModeStage : public ANYGameModeBase
 {
 	GENERATED_BODY()
-
+	
 public:
-	ANYGameMode();
+	ANYGameModeStage();
 
 	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
-// Wave
+	// Wave
 public:
 	UPROPERTY(EditDefaultsOnly, Category = "Wave")
 	TObjectPtr<UDataTable> WaveDataTable;
@@ -62,7 +62,7 @@ protected:
 	void GameOver();
 
 
-// Reward
+	// Reward
 public:
 	int32 RewardedPlayerCnt = 0;
 	FTimerHandle RewardTimeoutHandle;
@@ -74,7 +74,7 @@ protected:
 
 
 
-// Retry
+	// Retry
 public:
 	void AddRetryVote();
 
@@ -82,7 +82,7 @@ protected:
 	int32 RetryVoteCount = 0;
 
 
-// Spawner
+	// Spawner
 public:
 	void RegisterSpawner(class ANYMonsterSpawner* Spawner);
 

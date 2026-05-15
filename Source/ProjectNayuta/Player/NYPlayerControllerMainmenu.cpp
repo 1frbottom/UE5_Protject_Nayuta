@@ -3,6 +3,8 @@
 
 #include "Player/NYPlayerControllerMainmenu.h"
 
+#include "Player/NYPlayerStateMainmenu.h"
+
 
 
 void ANYPlayerControllerMainmenu::BeginPlay()
@@ -17,4 +19,12 @@ void ANYPlayerControllerMainmenu::BeginPlay()
     bShowMouseCursor = true;
 
 
+}
+
+void ANYPlayerControllerMainmenu::Server_ToggleReady_Implementation()
+{
+    if (ANYPlayerStateMainmenu* PS = Cast<ANYPlayerStateMainmenu>(PlayerState))
+    {
+        PS->SetIsReadyLobby(!PS->GetIsReadyLobby());
+    }
 }
