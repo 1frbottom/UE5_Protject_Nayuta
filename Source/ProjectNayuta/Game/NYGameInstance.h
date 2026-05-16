@@ -20,13 +20,25 @@ public:
 
     virtual void Init() override;
 
+// Common
+public:
+
+
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Network")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Multiplay")
     FString LobbyMapPath = TEXT("/Game/Levels/LV_Lobby?listen");
 
 
 // Session (Common & Internal)
 public:
+    UFUNCTION(BlueprintCallable, Category = "Network")
+    void LeaveSession();
+
+    UFUNCTION(BlueprintPure, Category = "Multiplay")
+    FName GetCurrentSessionName() const { return CurrentSessionName; }
+
+    UFUNCTION(BlueprintPure, Category = "Multiplay")
+    int32 GetPendingMaxPlayers() const { return PendingMaxPlayers; }
 
 protected:
     IOnlineSessionPtr SessionInterface;
@@ -37,17 +49,19 @@ protected:
     // HostGame()에서 바인딩
     FDelegateHandle CreateSessionCompleteDelegateHandle;
     FDelegateHandle DestroySessionCompleteDelegateHandle;
+    FDelegateHandle LeaveSessionCompleteDelegateHandle;
 
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
     void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+    void OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful);
 
 
 // Host & Join (General)
 public:
-    UFUNCTION(BlueprintCallable, Category = "Network")
-    void HostGame(FName SessionName, int32 MaxPlayers);
+    UFUNCTION(BlueprintCallable, Category = "Multiplay")
+    void HostGame(FName SessionName, int32 MaxPlayerNum);
 
-    UFUNCTION(BlueprintCallable, Category = "Network")
+    UFUNCTION(BlueprintCallable, Category = "Multiplay")
     void FindAndJoinSession();
 
 protected:

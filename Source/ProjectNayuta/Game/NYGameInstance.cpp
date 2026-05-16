@@ -35,6 +35,39 @@ void UNYGameInstance::Init()
 
 }
 
+void UNYGameInstance::LeaveSession()
+{
+    if (SessionInterface.IsValid() && !CurrentSessionName.IsNone())
+    {
+        LeaveSessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(
+            FOnDestroySessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnLeaveSessionComplete));
+
+        SessionInterface->DestroySession(CurrentSessionName);
+    }
+    else
+    {
+        // 세션이 없거나 유효하지 않으면 바로 초기화 후 이동
+        CurrentSessionName = FName();
+        PendingMaxPlayers = 0;
+
+        if (APlayerController* PC = GetFirstLocalPlayerController())
+            PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+    }
+}
+
+void UNYGameInstance::OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful)
+{
+    if (SessionInterface.IsValid())
+        SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(LeaveSessionCompleteDelegateHandle);
+
+    CurrentSessionName = FName();
+    PendingMaxPlayers = 0;
+
+    if (APlayerController* PC = GetFirstLocalPlayerController())
+        PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+
+}
+
 void UNYGameInstance::HostGame(FName SessionName, int32 MaxPlayers)
 {
     if (!SessionInterface.IsValid())
