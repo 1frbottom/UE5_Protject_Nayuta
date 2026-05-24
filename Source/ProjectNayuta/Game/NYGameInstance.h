@@ -25,6 +25,8 @@ public:
 
 
 protected:
+    void OnNetworkFailure(UWorld* World, class UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Multiplay")
     FString LobbyMapPath = TEXT("/Game/Levels/LV_Lobby?listen");
 
@@ -42,7 +44,10 @@ public:
 
 protected:
     IOnlineSessionPtr SessionInterface;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Multiplay")
     FName CurrentSessionName;
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Multiplay")
     int32 PendingMaxPlayers;
 
     // 공통 델리게이트 핸들

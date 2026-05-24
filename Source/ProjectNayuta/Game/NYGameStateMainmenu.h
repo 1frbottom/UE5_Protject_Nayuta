@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Game/NYGameStateBase.h"
+
+
 #include "NYGameStateMainmenu.generated.h"
 
 
@@ -20,7 +22,22 @@ class PROJECTNAYUTA_API ANYGameStateMainmenu : public ANYGameStateBase
 
 public:
 
+protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+
+// Session Info
+public:
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplay")
+	FName CurrentSessionName;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplay")
+	int32 MaxPlayers;
+
+protected:
+
+
+// PlayerState
 public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Multiplay")
 	TArray<class APlayerState*> GetSortedPlayerArray();
@@ -31,6 +48,7 @@ public:
 protected:
 	virtual void AddPlayerState(APlayerState* PlayerState) override;
 	virtual void RemovePlayerState(APlayerState* PlayerState) override;
+
 
 
 };

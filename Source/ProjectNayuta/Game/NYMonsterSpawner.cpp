@@ -34,8 +34,6 @@ void ANYMonsterSpawner::BeginPlay()
         {
             GM->RegisterSpawner(this);
         }
-
-        //GetWorldTimerManager().SetTimer(SpawnTimerHandle, this, &ANYMonsterSpawner::SpawnMonsterRoutine, SpawnInterval, true);
     }
 }
 

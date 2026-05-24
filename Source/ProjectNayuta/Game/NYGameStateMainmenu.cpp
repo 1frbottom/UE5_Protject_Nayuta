@@ -5,7 +5,18 @@
 
 #include "GameFramework/PlayerState.h"
 
+#include "Net/UnrealNetwork.h"
 
+
+void ANYGameStateMainmenu::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ANYGameStateMainmenu, CurrentSessionName);
+    DOREPLIFETIME(ANYGameStateMainmenu, MaxPlayers);
+
+
+}
 
 TArray<APlayerState*> ANYGameStateMainmenu::GetSortedPlayerArray()
 {

@@ -14,4 +14,10 @@ class PROJECTNAYUTA_API ANYGameModeMainmenu : public ANYGameModeBase
 {
 	GENERATED_BODY()
 	
+public:
+
+protected:
+	virtual void InitGameState() override;
+
+
 };

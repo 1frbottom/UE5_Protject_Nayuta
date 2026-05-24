@@ -32,17 +32,57 @@ void UNYGameInstance::Init()
         }
     }
 
+    // Network Failure Binding
+    if (GEngine)
+    {
+        GEngine->OnNetworkFailure().AddUObject(this, &UNYGameInstance::OnNetworkFailure);
+    }
 
+}
+
+void UNYGameInstance::OnNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
+{
+    // debug
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Network Error: %s"), *ErrorString));
+    }
+
+    if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
+    {
+        SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(LeaveSessionCompleteDelegateHandle);
+
+        LeaveSessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(
+            FOnDestroySessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnLeaveSessionComplete));
+        SessionInterface->DestroySession(NAME_GameSession);
+    }
+    else
+    {
+        if (APlayerController* PC = GetFirstLocalPlayerController())
+        {
+            PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+        }
+    }
+
+    //CurrentSessionName = FName();
+    //PendingMaxPlayers = 0;
+
+    //if (APlayerController* PC = GetFirstLocalPlayerController())
+    //{
+    //    PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+    //}
 }
 
 void UNYGameInstance::LeaveSession()
 {
-    if (SessionInterface.IsValid() && !CurrentSessionName.IsNone())
+    if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
     {
+        SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(LeaveSessionCompleteDelegateHandle);
+
         LeaveSessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(
             FOnDestroySessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnLeaveSessionComplete));
 
-        SessionInterface->DestroySession(CurrentSessionName);
+        SessionInterface->DestroySession(NAME_GameSession);
     }
     else
     {
@@ -77,26 +117,33 @@ void UNYGameInstance::HostGame(FName SessionName, int32 MaxPlayers)
     PendingMaxPlayers = MaxPlayers;
 
     // 이미 방이 있다면
-    if (SessionInterface->GetNamedSession(CurrentSessionName) != nullptr)
+    if (SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
     {
+        SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+
         DestroySessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(FOnDestroySessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnDestroySessionComplete));
 
-        SessionInterface->DestroySession(CurrentSessionName);
+        SessionInterface->DestroySession(NAME_GameSession);
 
         return;
     }
 
     FOnlineSessionSettings SessionSettings;
-    SessionSettings.bIsLANMatch = (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL");  // NULL 서브시스템(에디터)인 경우 LAN 매치로 설정
+    bool bIsLAN = (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL");
+    SessionSettings.bIsLANMatch = bIsLAN;
+    SessionSettings.bAllowJoinViaPresence = !bIsLAN;
+    SessionSettings.bUsesPresence = !bIsLAN;
+
     SessionSettings.NumPublicConnections = PendingMaxPlayers;
     SessionSettings.bAllowJoinInProgress = true;
-    SessionSettings.bAllowJoinViaPresence = true; // 스팀 초대를 위해 필수
     SessionSettings.bShouldAdvertise = true;
-    SessionSettings.bUsesPresence = true;         // 스팀 상태 정보 활용
+    SessionSettings.bUseLobbiesIfAvailable = true;
+
+    SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 
     CreateSessionCompleteDelegateHandle = SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(FOnCreateSessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnCreateSessionComplete));
 
-    SessionInterface->CreateSession(0, CurrentSessionName, SessionSettings);
+    SessionInterface->CreateSession(0, NAME_GameSession, SessionSettings);
 
 }
 
@@ -106,9 +153,11 @@ void UNYGameInstance::OnSessionUserInviteAccepted(bool bWasSuccessful, int32 Con
     if (!bWasSuccessful || !SessionInterface.IsValid())
         return;
 
-    // 초대를 통해 전달받은 세션 정보(InviteResult)로 바로 조인 시도
+    SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+
     JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(FOnJoinSessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnJoinSessionComplete));
 
+    // 초대를 통해 전달받은 세션 정보(InviteResult)로 바로 조인 시도
     SessionInterface->JoinSession(ControllerId, NAME_GameSession, InviteResult);
 
 
@@ -142,12 +191,20 @@ void UNYGameInstance::OnFindSessionsComplete(bool bWasSuccessful)
 
     if (bWasSuccessful && SessionSearch->SearchResults.Num() > 0)
     {
+        SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+
         JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(FOnJoinSessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnJoinSessionComplete));
 
         SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[0]);
     }
-
-
+    else
+    {
+        if (GEngine)
+        {
+            FString FailReason = !bWasSuccessful ? TEXT("Search Failed") : TEXT("No Sessions Found");
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FailReason);
+        }
+    }
 }
 
 void UNYGameInstance::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
@@ -157,6 +214,8 @@ void UNYGameInstance::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCom
 
     if (Result == EOnJoinSessionCompleteResult::Success)
     {
+        CurrentSessionName = SessionName;
+
         FString ConnectString;
         if (SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
         {
@@ -164,8 +223,18 @@ void UNYGameInstance::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCom
                 PC->ClientTravel(ConnectString, TRAVEL_Absolute);
         }
     }
+    else
+    {
+        if (GEngine)
+        {
+            FString ErrorReason = TEXT("Unknown Error");
+            if (Result == EOnJoinSessionCompleteResult::AlreadyInSession) ErrorReason = TEXT("Already In Session");
+            else if (Result == EOnJoinSessionCompleteResult::SessionDoesNotExist) ErrorReason = TEXT("Session Does Not Exist");
+            else if (Result == EOnJoinSessionCompleteResult::SessionIsFull) ErrorReason = TEXT("Session Is Full");
 
-
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Join Failed: %s"), *ErrorReason));
+        }
+    }
 }
 
 void UNYGameInstance::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
@@ -184,12 +253,27 @@ void UNYGameInstance::FindAndJoinSession()
     if (!SessionInterface.IsValid())
         return;
 
+    if (SessionSearch.IsValid() && SessionSearch->SearchState == EOnlineAsyncTaskState::InProgress)
+    {
+        if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, TEXT("Search already in progress..."));
+        return;
+    }
+
+    SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+
     FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FOnFindSessionsCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnFindSessionsComplete));
 
     SessionSearch = MakeShareable(new FOnlineSessionSearch());
-    SessionSearch->bIsLanQuery = (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL");
     SessionSearch->MaxSearchResults = 10000;
-    SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+
+    bool bIsLAN = (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL");
+    SessionSearch->bIsLanQuery = bIsLAN;
+    if (!bIsLAN)
+    {
+        SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+
+        SessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+    }
 
     SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
 
