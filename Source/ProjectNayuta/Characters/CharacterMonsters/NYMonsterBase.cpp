@@ -14,6 +14,7 @@
 #include "UI/NYHpBarWidgetMonster.h"
 
 #include "Game/NYGameModeStage.h"
+#include "Game/NYMonsterPoolManager.h"
 
 
 
@@ -29,6 +30,9 @@ ANYMonsterBase::ANYMonsterBase()
     CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
     RootComponent = CapsuleComp;
     CapsuleComp->SetCollisionProfileName(PROFILE_MONSTER);
+        
+        // should be adjusted well
+    CapsuleComp->InitCapsuleSize(15.0f, 40.0f);
 
         // UI
     HpBarWidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("HpBarWidgetComp"));
@@ -41,7 +45,6 @@ ANYMonsterBase::ANYMonsterBase()
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComp"));
     SkeletalMeshComp->SetupAttachment(RootComponent);
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
 
 
 }
@@ -108,25 +111,32 @@ void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 // 언리얼 내장 데미지 처리 함수 오버라이드
 float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-    // 체력 깎기는 무조건 서버에서만
     if (!HasAuthority())
         return 0.0f;
 
     CurrentHp -= DamageAmount;
-
     OnRep_CurrentHp();
 
     if (CurrentHp <= 0.0f)
     {
-        // TODO : 경험치 보석 스폰 로직 호출
-        
+        // TODO : 경험치 보석 스폰 로직
+
 
         if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
         {
             GM->OnEnemyKilled();
+
+            // 풀에 반납
+            if (GM->GetMonsterPoolManager())
+                GM->GetMonsterPoolManager()->ReturnMonster(this);
+            else
+                Destroy(); // Fallback
         }
-        
-        Destroy();
+
+        // 반납 시점 상태 초기화
+        TargetActor = nullptr;
+        CurrentHp = MaxHp;
+        OnRep_CurrentHp();      // UI도 다시 풀피 상태로 리셋
     }
 
     return DamageAmount;

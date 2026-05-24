@@ -36,6 +36,9 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Spawn")
     float SpawnRadius;
 
+    UPROPERTY(EditAnywhere, Category = "Spawn")
+    int32 SpawnCountPerTick = 100;
+
 private:
     FTimerHandle SpawnTimerHandle;
 

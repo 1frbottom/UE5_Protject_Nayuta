@@ -10,6 +10,7 @@
 
 #include "Game/NYGameStateStage.h"
 #include "Game/NYMonsterSpawner.h"
+#include "Game/NYMonsterPoolManager.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
@@ -28,6 +29,23 @@ void ANYGameModeStage::BeginPlay()
 
 	// GS->SetGamePhase(ENYGamePhase::Waiting);
 
+	// spawning Pool Manager
+	if (GetWorld())
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		MonsterPoolManager = GetWorld()->SpawnActor<ANYMonsterPoolManager>(ANYMonsterPoolManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+		// 웨이브 데이터 시트의 1번 웨이브 정보를 읽어 몬스터 풀 초기화 (Pre-warm)
+		if (MonsterPoolManager && WaveDataTable)
+		{
+			FNYWaveDataRow* FirstWaveData = WaveDataTable->FindRow<FNYWaveDataRow>(FName(TEXT("1")), TEXT("PoolInitContext"));
+			if (FirstWaveData && FirstWaveData->MonsterClass)
+			{
+				MonsterPoolManager->InitializePool(FirstWaveData->MonsterClass, InitialPoolSize);
+			}
+		}
+	}
 
 	// TODO : 멀티플레이 동기화를 위해 일정 시간 대기 후 시작하도록 수정 필요
 
@@ -188,10 +206,14 @@ void ANYGameModeStage::StartRewardPhase()
 	// TODO : 게임을 멈추던지, 무적으로 만들던지, 진행 멈춰야함, 일단 아래처럼 해놓긴 했는데 뭔가 별로같음
 	TArray<AActor*> AliveMonsters;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANYMonsterBase::StaticClass(), AliveMonsters);
+
 	for (AActor* Actor : AliveMonsters)
 		if (ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Actor))
 		{
-			Monster->Destroy(); // 혹은 체력을 0으로 깎는 함수 호출
+			if (MonsterPoolManager)
+				MonsterPoolManager->ReturnMonster(Monster);
+			else
+				Monster->Destroy();
 		}
 
 	// GameState
@@ -210,7 +232,6 @@ void ANYGameModeStage::StartRewardPhase()
 			}
 		}
 	}
-
 
 
 	RewardedPlayerCnt = 0;

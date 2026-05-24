@@ -6,6 +6,8 @@
 #include "GameFramework/Pawn.h"
 #include "NYMonsterBase.generated.h"
 
+
+
 class UCapsuleComponent;
 class USkeletalMeshComponent;
 class UWidgetComponent;

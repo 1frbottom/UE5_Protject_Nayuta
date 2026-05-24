@@ -139,10 +139,10 @@ void ANYPlayerStateStage::OnRep_CurrHp()
         }
 
         // debug
-        GEngine->AddOnScreenDebugMessage(
-            -1, 5.f, FColor::Cyan,
-            FString::Printf(TEXT("MaxHp : %f, CurrHp : %f"), MaxHP, CurrHp)
-        );
+        //GEngine->AddOnScreenDebugMessage(
+        //    -1, 5.f, FColor::Cyan,
+        //    FString::Printf(TEXT("MaxHp : %f, CurrHp : %f"), MaxHP, CurrHp)
+        //);
     }
 }
 

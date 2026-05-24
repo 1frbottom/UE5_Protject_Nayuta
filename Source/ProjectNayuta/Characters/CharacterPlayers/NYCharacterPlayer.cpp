@@ -50,6 +50,9 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     GetCharacterMovement()->bOrientRotationToMovement = true;
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
 
+        // test
+    GetCharacterMovement()->JumpZVelocity = 1000.f;
+
     // Stat
 
 

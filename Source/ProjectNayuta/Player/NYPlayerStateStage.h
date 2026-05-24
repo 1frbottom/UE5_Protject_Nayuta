@@ -65,10 +65,14 @@ public:
 
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
-	float MaxHP = 100.0f;
+	//float MaxHP = 100.0f;
+	float MaxHP = 10000000.0f;
+
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrHp, BlueprintReadOnly, Category = "Stat")
-	float CurrHp = 100.0f;
+	//float CurrHp = 100.0f;
+	float CurrHp = 10000000.0f;
+
 
 	UFUNCTION()
 	void OnRep_CurrHp();

@@ -11,6 +11,7 @@
 
 
 class ANYPlayerControllerStage;
+class ANYMonsterPoolManager;
 
 USTRUCT(BlueprintType)
 struct FNYWaveDataRow : public FTableRowBase
@@ -84,9 +85,18 @@ protected:
 
 	// Spawner
 public:
+	FORCEINLINE ANYMonsterPoolManager* GetMonsterPoolManager() const { return MonsterPoolManager; }
+
 	void RegisterSpawner(class ANYMonsterSpawner* Spawner);
 
+
 protected:
+	UPROPERTY(Transient)
+	TObjectPtr<ANYMonsterPoolManager> MonsterPoolManager;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Wave|Pool")
+	int32 InitialPoolSize = 1000;
+	
 	UPROPERTY(Transient)
 	TArray<ANYMonsterSpawner*> ActiveSpawners;
 
