@@ -21,6 +21,7 @@ ANYAttackPlayerSword::ANYAttackPlayerSword()
 	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
 
 	InitialLifeSpan = 1.0f;
+
 }
 
 void ANYAttackPlayerSword::BeginPlay()
@@ -44,4 +45,5 @@ void ANYAttackPlayerSword::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, A
 			// 관통형이면 그대로 두고, 단일 타겟이면 여기서 Destroy() 호출
 
 		}
+
 }

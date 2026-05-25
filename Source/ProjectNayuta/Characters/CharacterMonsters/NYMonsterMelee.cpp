@@ -12,11 +12,7 @@
 
 ANYMonsterMelee::ANYMonsterMelee()
 {
-	AttackSphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("AttackSphereComp"));
-	AttackSphereComp->SetupAttachment(RootComponent);
-	AttackSphereComp->InitSphereRadius(60.0f);
 
-	AttackSphereComp->SetCollisionProfileName(PROFILE_MONSTER_ATTACK);
 
 }
 

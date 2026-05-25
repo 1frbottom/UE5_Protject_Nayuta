@@ -39,6 +39,11 @@ ANYMonsterBase::ANYMonsterBase()
     SkeletalMeshComp->SetupAttachment(RootComponent);
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+        // test
+    SphereComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HpSphereComp"));
+    SphereComp->SetupAttachment(RootComponent);
+    SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
 
 }
 
@@ -123,7 +128,11 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
 
 void ANYMonsterBase::OnRep_CurrentHp()
 {
-
+    // test
+    float HpRatio = FMath::Max(0.3f, CurrentHp / MaxHp);
+    
+    if (SphereComp)
+        SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
 
 }
 

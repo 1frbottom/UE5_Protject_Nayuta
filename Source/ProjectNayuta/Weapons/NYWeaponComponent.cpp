@@ -55,11 +55,12 @@ void UNYWeaponComponent::FireAttack()
 	FCollisionQueryParams CollisionParams;
 	CollisionParams.AddIgnoredActor(GetOwner());
 
+	// true only if block
 	bool bHit = GetWorld()->OverlapMultiByChannel(
-		OverlapResults, StartLoc, FQuat::Identity, ECC_MONSTER,
+		OverlapResults, StartLoc, FQuat::Identity, ECC_PLAYERATTACK,
 		FCollisionShape::MakeSphere(CurrentRange), CollisionParams);
 
-	if (bHit)
+	if (OverlapResults.Num() > 0)
 	{
 		ANYMonsterBase* TargetMonster = nullptr;
 		float MinDistance = CurrentRange + 1.0f;
@@ -95,6 +96,7 @@ void UNYWeaponComponent::FireAttack()
 			{
 				SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);
 			}
+
 		}
 	}
 }

@@ -37,6 +37,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<USkeletalMeshComponent> SkeletalMeshComp;
 
+        // test
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
+    TObjectPtr<class UStaticMeshComponent> SphereComp;
 
 // Stat
 public:

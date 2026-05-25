@@ -26,9 +26,6 @@ public:
 	virtual void Deactivate() override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Attack")
-	TObjectPtr<USphereComponent> AttackSphereComp;
-
 	UPROPERTY(EditAnywhere, Category = "Attack")
 	float AttackDamage = 10.0f;
 
