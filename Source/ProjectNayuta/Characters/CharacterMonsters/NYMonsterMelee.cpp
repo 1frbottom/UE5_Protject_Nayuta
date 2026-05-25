@@ -20,11 +20,6 @@ void ANYMonsterMelee::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 서버에서만 데미지 판정 타이머 실행
-	if (HasAuthority())
-	{
-		GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterMelee::ProcessMeleeAttack, AttackInterval, true);
-	}
 }
 
 void ANYMonsterMelee::ResetState()
