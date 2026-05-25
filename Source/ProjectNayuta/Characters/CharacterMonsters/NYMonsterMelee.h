@@ -19,6 +19,12 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+
+// stat
+public:
+	virtual void ResetState() override;
+	virtual void Deactivate() override;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Attack")
 	TObjectPtr<USphereComponent> AttackSphereComp;
@@ -34,6 +40,7 @@ private:
 
 	UFUNCTION()
 	void ProcessMeleeAttack();
+
 
 
 };

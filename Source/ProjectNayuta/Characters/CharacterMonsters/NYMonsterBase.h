@@ -21,8 +21,13 @@ class PROJECTNAYUTA_API ANYMonsterBase : public APawn
 public:
 	ANYMonsterBase();
 
+    virtual void Tick(float DeltaTime) override;
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	virtual void BeginPlay() override;
+
 
 // Component
 protected:
@@ -32,10 +37,18 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<USkeletalMeshComponent> SkeletalMeshComp;
 
+
 // Stat
+public:
+    virtual void ResetState();  // when pulled out of pool
+    virtual void Deactivate();  // when returns to pool
+
 protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
     float MoveSpeed = 200.0f;
+
+    UPROPERTY()
+    float RandomizedMoveSpeed;
 
     // Hp
     UPROPERTY(EditAnywhere, Category = "Stats")
@@ -47,32 +60,22 @@ protected:
     UFUNCTION()
     void OnRep_CurrentHp();
 
-// UI
-protected:
-    /* Must be designated in BP_MonsterASDF*/
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
-    TObjectPtr<UWidgetComponent> HpBarWidgetComp;
-
-    UPROPERTY()
-    TObjectPtr<UNYHpBarWidgetMonster> CachedHpBarWidget;
 
 // Multiplay
-protected:
-    /* initialized by NYMonsterBase->SerTarget() */
-    UPROPERTY(Replicated, Transient)
-    TObjectPtr<AActor> TargetActor;
-
-public:	
-	virtual void Tick(float DeltaTime) override;
-
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
+public:
     // 서버에서 초기 타겟을 설정해주는 함수
     /* called by NYMonsterSpawner */
     void SetTarget(AActor* NewTarget);
 
     // 데미지 처리 (서버에서만 실행됨)
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+
+protected:
+    /* initialized by NYMonsterBase->SerTarget() */
+    UPROPERTY(Replicated, Transient)
+    TObjectPtr<AActor> TargetActor;
+
+
 
 
 };

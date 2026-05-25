@@ -21,6 +21,12 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+
+// stat
+public:
+	virtual void ResetState() override;
+	virtual void Deactivate() override;
+
 protected:
 	/* Must be designated in BP_MonsterRanged */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")

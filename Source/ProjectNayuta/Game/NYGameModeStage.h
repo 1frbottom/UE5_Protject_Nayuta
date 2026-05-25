@@ -94,7 +94,7 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<ANYMonsterPoolManager> MonsterPoolManager;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Wave|Pool")
+	UPROPERTY(EditDefaultsOnly, Category = "Spawner")
 	int32 InitialPoolSize = 1000;
 	
 	UPROPERTY(Transient)

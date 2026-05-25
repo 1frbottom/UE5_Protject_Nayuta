@@ -55,9 +55,7 @@ ANYMonsterBase* ANYMonsterPoolManager::GetMonster(FVector SpawnLocation, FRotato
 		Monster->SetActorEnableCollision(true);
 		Monster->SetActorTickEnabled(true);
 
-		// TODO: 여기서 몬스터 HP 초기화 등 리셋 로직 호출 필요
-
-
+		Monster->ResetState();
 	}
 
 	return Monster;
@@ -67,6 +65,8 @@ void ANYMonsterPoolManager::ReturnMonster(ANYMonsterBase* Monster)
 {
 	if (!Monster)
 		return;
+
+	Monster->Deactivate();
 
 	Monster->SetActorHiddenInGame(true);
 	Monster->SetActorEnableCollision(false);

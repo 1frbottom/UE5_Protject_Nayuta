@@ -22,8 +22,9 @@ public:
 public:
 	void InitializePool(TSubclassOf<ANYMonsterBase> MonsterClass, int32 PoolSize);
 
-	ANYMonsterBase* GetMonster(FVector SpawnLocation, FRotator SpawnRotation);
+	void ResetState();
 
+	ANYMonsterBase* GetMonster(FVector SpawnLocation, FRotator SpawnRotation);
 	void ReturnMonster(ANYMonsterBase* Monster);
 
 protected:

@@ -31,16 +31,36 @@ void ANYMonsterMelee::BeginPlay()
 	}
 }
 
+void ANYMonsterMelee::ResetState()
+{
+	Super::ResetState();
+
+	if (HasAuthority())
+	{
+		GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterMelee::ProcessMeleeAttack, AttackInterval, true);
+	}
+}
+
+void ANYMonsterMelee::Deactivate()
+{
+	Super::Deactivate();
+
+	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+}
+
 void ANYMonsterMelee::ProcessMeleeAttack()
 {
-	TArray<AActor*> OverlappedActors;
-	AttackSphereComp->GetOverlappingActors(OverlappedActors);
+	if (TargetActor == nullptr)
+		return;
 
-	for (AActor* Actor : OverlappedActors)
+	// 단순 거리벡터로 변경
+	float DistSq = FVector::DistSquared(GetActorLocation(), TargetActor->GetActorLocation());
+
+	float AttackRangeSq = FMath::Square(100.0f);
+
+	if (DistSq <= AttackRangeSq)
 	{
-		if (Actor && Actor != this)
-		{
-			UGameplayStatics::ApplyDamage(Actor, AttackDamage, GetController(), this, UDamageType::StaticClass());
-		}
+		UGameplayStatics::ApplyDamage(TargetActor, AttackDamage, GetController(), this, UDamageType::StaticClass());
 	}
+
 }

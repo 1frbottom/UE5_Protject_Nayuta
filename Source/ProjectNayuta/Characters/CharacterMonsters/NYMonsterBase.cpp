@@ -34,13 +34,6 @@ ANYMonsterBase::ANYMonsterBase()
         // should be adjusted well
     CapsuleComp->InitCapsuleSize(15.0f, 40.0f);
 
-        // UI
-    HpBarWidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("HpBarWidgetComp"));
-    HpBarWidgetComp->SetupAttachment(RootComponent);
-    HpBarWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
-    HpBarWidgetComp->SetDrawSize(FVector2D(100.0f, 15.0f));
-    HpBarWidgetComp->SetRelativeLocation(FVector(0.0f, 0.0f, 100.0f));
-
         // 메시 충돌연산 제외
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComp"));
     SkeletalMeshComp->SetupAttachment(RootComponent);
@@ -56,19 +49,6 @@ void ANYMonsterBase::BeginPlay()
     // Stat
     CurrentHp = MaxHp;
 
-    // UI
-    if (HpBarWidgetComp)
-    {
-        // 캐스팅은 딱 한번만 하도록 BeginPlay에서
-        CachedHpBarWidget = Cast<UNYHpBarWidgetMonster>(HpBarWidgetComp->GetUserWidgetObject());
-
-        // 스폰 직후 풀피 상태 UI 반영
-        if (CachedHpBarWidget)
-        {
-            CachedHpBarWidget->UpdateHpBar(1.0f);
-        }
-    }
-
 
 }
 
@@ -81,8 +61,12 @@ void ANYMonsterBase::Tick(float DeltaTime)
     {
         FVector Direction = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
 
-        // Sweep을 true로 주어 몬스터끼리 겹치는 것 방지
-        AddActorWorldOffset(Direction * MoveSpeed * DeltaTime, true);
+        // 뭉침 해소 위해 벡터에 랜덤 노이즈 추가
+        Direction.X += FMath::RandRange(-0.1f, 0.1f);
+        Direction.Y += FMath::RandRange(-0.1f, 0.1f);
+        Direction.Normalize();
+
+        AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, false);
 
         // 부드러운 시선 회전 보간
         FRotator TargetRotation = Direction.Rotation();
@@ -132,11 +116,6 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
             else
                 Destroy(); // Fallback
         }
-
-        // 반납 시점 상태 초기화
-        TargetActor = nullptr;
-        CurrentHp = MaxHp;
-        OnRep_CurrentHp();      // UI도 다시 풀피 상태로 리셋
     }
 
     return DamageAmount;
@@ -144,10 +123,22 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
 
 void ANYMonsterBase::OnRep_CurrentHp()
 {
-    // 캐싱된 포인터를 사용해 형변환 없이 즉시 UI 갱신
-    if (CachedHpBarWidget)
-    {
-        float HpPercentage = CurrentHp / MaxHp;
-        CachedHpBarWidget->UpdateHpBar(HpPercentage);
-    }
+
+
+}
+
+void ANYMonsterBase::ResetState()
+{
+    TargetActor = nullptr;
+    CurrentHp = MaxHp;
+
+    // 이동 속도 80% ~ 120% 사이 랜덤화
+    RandomizedMoveSpeed = MoveSpeed * FMath::RandRange(0.8f, 1.2f);
+
+    OnRep_CurrentHp();
+}
+
+void ANYMonsterBase::Deactivate()
+{
+
 }
