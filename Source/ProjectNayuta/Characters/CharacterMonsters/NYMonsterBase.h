@@ -43,8 +43,6 @@ protected:
 
 // Stat
 public:
-    virtual void ResetState();  // when pulled out of pool
-    virtual void Deactivate();  // when returns to pool
 
 protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
@@ -73,12 +71,20 @@ public:
     // 데미지 처리 (서버에서만 실행됨)
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+    void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
+    void DeactivateOnServer();
+
 protected:
     /* initialized by NYMonsterBase->SerTarget() */
-    UPROPERTY(Replicated, Transient)
+    UPROPERTY(ReplicatedUsing = OnRep_TargetActor, Transient)
     TObjectPtr<AActor> TargetActor;
 
+    UFUNCTION()
+    virtual void OnRep_TargetActor();   // Activate, DeActivate 대체
 
+    // 클라이언트 로컬 이동용 변수 추가
+    UPROPERTY(Transient)
+    TObjectPtr<AActor> LocalTargetActor;
 
 
 };

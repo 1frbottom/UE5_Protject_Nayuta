@@ -39,26 +39,9 @@ ANYMonsterBase* ANYMonsterPoolManager::GetMonster(FVector SpawnLocation, FRotato
 {
 
 	if (MonsterPool.IsEmpty())
-	{
-		// 풀이 다 떨어졌을 때의 예외 처리 (새로 스폰하거나 널 반환)
-		// 당장 내일 테스트용이므로 널 반환으로 둡니다. 필요시 동적 할당 추가.
-
 		return nullptr;
-	}
 
-	// 배열 맨 뒤에서 하나 꺼내기
-	ANYMonsterBase* Monster = MonsterPool.Pop();
-	if (Monster)
-	{
-		Monster->SetActorLocationAndRotation(SpawnLocation, SpawnRotation);
-		Monster->SetActorHiddenInGame(false);
-		Monster->SetActorEnableCollision(true);
-		Monster->SetActorTickEnabled(true);
-
-		Monster->ResetState();
-	}
-
-	return Monster;
+	return MonsterPool.Pop();
 }
 
 void ANYMonsterPoolManager::ReturnMonster(ANYMonsterBase* Monster)
@@ -66,12 +49,7 @@ void ANYMonsterPoolManager::ReturnMonster(ANYMonsterBase* Monster)
 	if (!Monster)
 		return;
 
-	Monster->Deactivate();
-
-	Monster->SetActorHiddenInGame(true);
-	Monster->SetActorEnableCollision(false);
-	Monster->SetActorTickEnabled(false);
-
+	Monster->DeactivateOnServer();
 	MonsterPool.Add(Monster);
 }
 

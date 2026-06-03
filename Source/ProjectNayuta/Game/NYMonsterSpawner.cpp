@@ -98,17 +98,17 @@ void ANYMonsterSpawner::SpawnMonsterRoutine()
         // 캡슐 콜리전 겹침 방지를 위한 임시 오프셋 (인덱스 기반으로 흩뿌리기)
         SpawnLocation.X += FMath::RandRange(-50.0f, 50.0f) * i;
         SpawnLocation.Y += FMath::RandRange(-50.0f, 50.0f) * i;
-        SpawnLocation.Z += 50.0f; // 바닥 관통 방지
+        SpawnLocation.Z += 50.0f;
 
         FRotator SpawnRotation = FRotator::ZeroRotator;
 
         // 풀에서 몬스터 가져오기 (SpawnActor 대체)
-        ANYMonsterBase* SpawnedMonster = PoolManager->GetMonster(SpawnLocation, SpawnRotation);
+        ANYMonsterBase* SpawnedMonster = PoolManager->GetMonster(SpawnLocation, FRotator::ZeroRotator);
 
         // 타겟 지정
         if (SpawnedMonster)
         {
-            SpawnedMonster->SetTarget(TargetCharacter);
+            SpawnedMonster->ActivateOnServer(TargetCharacter, SpawnLocation);
         }
     }
 

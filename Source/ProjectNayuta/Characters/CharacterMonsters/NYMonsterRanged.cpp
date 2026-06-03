@@ -29,23 +29,6 @@ void ANYMonsterRanged::BeginPlay()
 
 }
 
-void ANYMonsterRanged::ResetState()
-{
-	Super::ResetState();
-
-	if (HasAuthority())
-	{
-		GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
-	}
-}
-
-void ANYMonsterRanged::Deactivate()
-{
-	Super::Deactivate();
-
-	GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
-}
-
 void ANYMonsterRanged::CheckAndFire()
 {
 	// 1. Å¸°Ù Ã¼Å©

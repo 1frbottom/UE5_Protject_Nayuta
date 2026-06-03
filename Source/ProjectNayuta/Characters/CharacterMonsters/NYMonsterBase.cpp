@@ -24,7 +24,15 @@ ANYMonsterBase::ANYMonsterBase()
 
     // Multiplay
     bReplicates = true;
-    SetReplicateMovement(true);
+
+        // using client tick
+    SetReplicateMovement(false);
+
+    NetUpdateFrequency = 5.0f;
+    NetCullDistanceSquared = 9000000.0f;
+
+    NetDormancy = DORM_DormantAll;
+
 
     // Component
     CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
@@ -62,9 +70,9 @@ void ANYMonsterBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
     // Navmesh 대신 벡터이동
-    if (TargetActor != nullptr)
+    if (LocalTargetActor != nullptr)
     {
-        FVector Direction = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+        FVector Direction = (LocalTargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
 
         // 뭉침 해소 위해 벡터에 랜덤 노이즈 추가
         Direction.X += FMath::RandRange(-0.1f, 0.1f);
@@ -85,6 +93,7 @@ void ANYMonsterBase::SetTarget(AActor* NewTarget)
     if (HasAuthority())
     {
         TargetActor = NewTarget;
+        OnRep_TargetActor();
     }
 
 }
@@ -126,6 +135,53 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
     return DamageAmount;
 }
 
+void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
+{
+    if (HasAuthority())
+    {
+        SetActorLocation(StartLocation);
+        SetNetDormancy(DORM_Awake);
+        TargetActor = NewTarget;
+
+        OnRep_TargetActor();
+    }
+}
+
+void ANYMonsterBase::DeactivateOnServer()
+{
+    if (HasAuthority())
+    {
+        SetNetDormancy(DORM_DormantAll);
+        TargetActor = nullptr;
+
+        OnRep_TargetActor();
+    }
+}
+
+void ANYMonsterBase::OnRep_TargetActor()
+{
+    if (TargetActor != nullptr)
+    {
+        LocalTargetActor = TargetActor;
+
+        SetActorHiddenInGame(false);
+        SetActorEnableCollision(true);
+        SetActorTickEnabled(true);
+
+        // 클라이언트 전용 속도 오차 적용 등
+        RandomizedMoveSpeed = MoveSpeed * FMath::RandRange(0.8f, 1.2f);
+        OnRep_CurrentHp();
+    }
+    else
+    {
+        LocalTargetActor = nullptr;
+
+        SetActorHiddenInGame(true);
+        SetActorEnableCollision(false);
+        SetActorTickEnabled(false);
+    }
+}
+
 void ANYMonsterBase::OnRep_CurrentHp()
 {
     // test
@@ -133,21 +189,5 @@ void ANYMonsterBase::OnRep_CurrentHp()
     
     if (SphereComp)
         SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
-
-}
-
-void ANYMonsterBase::ResetState()
-{
-    TargetActor = nullptr;
-    CurrentHp = MaxHp;
-
-    // 이동 속도 80% ~ 120% 사이 랜덤화
-    RandomizedMoveSpeed = MoveSpeed * FMath::RandRange(0.8f, 1.2f);
-
-    OnRep_CurrentHp();
-}
-
-void ANYMonsterBase::Deactivate()
-{
 
 }

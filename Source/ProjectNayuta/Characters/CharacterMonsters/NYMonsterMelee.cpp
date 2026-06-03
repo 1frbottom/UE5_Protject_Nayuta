@@ -22,23 +22,6 @@ void ANYMonsterMelee::BeginPlay()
 
 }
 
-void ANYMonsterMelee::ResetState()
-{
-	Super::ResetState();
-
-	if (HasAuthority())
-	{
-		GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterMelee::ProcessMeleeAttack, AttackInterval, true);
-	}
-}
-
-void ANYMonsterMelee::Deactivate()
-{
-	Super::Deactivate();
-
-	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-}
-
 void ANYMonsterMelee::ProcessMeleeAttack()
 {
 	if (TargetActor == nullptr)

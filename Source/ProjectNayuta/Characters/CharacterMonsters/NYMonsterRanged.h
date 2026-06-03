@@ -24,8 +24,6 @@ protected:
 
 // stat
 public:
-	virtual void ResetState() override;
-	virtual void Deactivate() override;
 
 protected:
 	/* Must be designated in BP_MonsterRanged */
@@ -52,6 +50,11 @@ private:
 	void CheckAndFire();
 
 	void FireProjectile();
+
+
+// multiplay
+public:
+
 
 
 };

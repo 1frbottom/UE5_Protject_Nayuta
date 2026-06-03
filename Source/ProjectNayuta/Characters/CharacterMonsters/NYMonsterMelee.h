@@ -22,8 +22,6 @@ protected:
 
 // stat
 public:
-	virtual void ResetState() override;
-	virtual void Deactivate() override;
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Attack")
@@ -37,6 +35,10 @@ private:
 
 	UFUNCTION()
 	void ProcessMeleeAttack();
+
+
+// multiplay
+public:
 
 
 
