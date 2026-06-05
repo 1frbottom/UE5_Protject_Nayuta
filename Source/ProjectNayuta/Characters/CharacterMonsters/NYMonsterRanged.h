@@ -54,6 +54,7 @@ private:
 
 // multiplay
 public:
+	virtual void OnRep_ActivationData() override;
 
 
 

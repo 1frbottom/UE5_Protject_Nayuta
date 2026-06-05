@@ -21,27 +21,19 @@ void ANYMonsterRanged::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (HasAuthority())
-	{
-		GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
-	}
-
 
 }
 
 void ANYMonsterRanged::CheckAndFire()
 {
-	// 1. 타겟 체크
-	if (!TargetActor)
+	if (!ActivationData.Target)
 		return;
 
-	// 2. 쿨타임 체크
 	float CurrentTime = GetWorld()->GetTimeSeconds();
 	if (CurrentTime - LastFireTime < FireRate)
 		return;
 
-	// 3. 거리 체크
-	float DistSq = FVector::DistSquared(GetActorLocation(), TargetActor->GetActorLocation());
+	float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
 	if (DistSq <= AttackRangeSqrd)
 	{
 		FireProjectile();
@@ -51,11 +43,11 @@ void ANYMonsterRanged::CheckAndFire()
 
 void ANYMonsterRanged::FireProjectile()
 {
-	if (!ProjectileClass || !TargetActor)
+	if (!ProjectileClass || !ActivationData.Target)
 		return;
 
 	FVector SpawnLocation = GetActorLocation() + GetActorForwardVector() * 50.0f;
-	FRotator SpawnRotation = (TargetActor->GetActorLocation() - SpawnLocation).Rotation();
+	FRotator SpawnRotation = (ActivationData.Target->GetActorLocation() - SpawnLocation).Rotation();
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
@@ -66,5 +58,22 @@ void ANYMonsterRanged::FireProjectile()
 	if (Projectile)
 	{
 		Projectile->InitAttackStat(AttackDamage, AttackRange);
+	}
+}
+
+void ANYMonsterRanged::OnRep_ActivationData()
+{
+	Super::OnRep_ActivationData();
+
+	if (ActivationData.Target != nullptr)
+	{
+		if (HasAuthority())
+		{
+			GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
+		}
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
 	}
 }

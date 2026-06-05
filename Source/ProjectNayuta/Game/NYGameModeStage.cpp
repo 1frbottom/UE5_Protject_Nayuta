@@ -9,8 +9,8 @@
 #include "Player/NYPlayerStateStage.h"
 
 #include "Game/NYGameStateStage.h"
-#include "Game/NYMonsterSpawner.h"
-#include "Game/NYMonsterPoolManager.h"
+#include "Game/NYMonsterSpawnComponent.h"
+#include "Game/NYMonsterPoolComponent.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
@@ -18,9 +18,7 @@
 
 ANYGameModeStage::ANYGameModeStage()
 {
-
-
-
+	MonsterPoolComponent = CreateDefaultSubobject<UNYMonsterPoolComponent>(TEXT("MonsterPool"));
 }
 
 void ANYGameModeStage::BeginPlay()
@@ -29,25 +27,17 @@ void ANYGameModeStage::BeginPlay()
 
 	// GS->SetGamePhase(ENYGamePhase::Waiting);
 
-	// spawning Pool Manager
-	if (GetWorld())
+	// Pre-warm pool from wave 1 row (server-only; component lives on GameMode).
+	if (MonsterPoolComponent && WaveDataTable)
 	{
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		MonsterPoolManager = GetWorld()->SpawnActor<ANYMonsterPoolManager>(ANYMonsterPoolManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-
-		// 웨이브 데이터 시트의 1번 웨이브 정보를 읽어 몬스터 풀 초기화 (Pre-warm)
-		if (MonsterPoolManager && WaveDataTable)
+		FNYWaveDataRow* FirstWaveData = WaveDataTable->FindRow<FNYWaveDataRow>(FName(TEXT("1")), TEXT("PoolInitContext"));
+		if (FirstWaveData && FirstWaveData->MonsterClass)
 		{
-			FNYWaveDataRow* FirstWaveData = WaveDataTable->FindRow<FNYWaveDataRow>(FName(TEXT("1")), TEXT("PoolInitContext"));
-			if (FirstWaveData && FirstWaveData->MonsterClass)
-			{
-				MonsterPoolManager->InitializePool(FirstWaveData->MonsterClass, InitialPoolSize);
-			}
+			MonsterPoolComponent->InitializePool(FirstWaveData->MonsterClass, InitialPoolSize);
 		}
 	}
 
-	// TODO : 멀티플레이 동기화를 위해 일정 시간 대기 후 시작하도록 수정 필요
+	// TODO: Wait for multiplayer ready (player join sync) before calling StartNextWave.
 
 
 	StartNextWave();
@@ -72,17 +62,16 @@ void ANYGameModeStage::Logout(AController* Exiting)
 	if (!GS)
 		return;
 
-	// 보상 페이즈에서 누군가 나갔을 때 Softlock 방지
+	// Avoid reward-phase softlock when someone leaves during rewarding.
 	if (GS->GetGamePhase() == ENYGamePhase::Rewarding)
 	{
-		// 나간 사람 때문에 남은 인원(GetNumPlayers)이 보상 완료 인원과 같아지거나 작아졌다면 즉시 다음 웨이브 시작
 		if (RewardedPlayerCnt >= GetNumPlayers())
 		{
 			StartNextWave();
 		}
 	}
 
-	// 재시작 투표 대기 중일 때 Softlock 방지
+	// Avoid game-over retry softlock when someone leaves after voting.
 	if (GS->GetGamePhase() == ENYGamePhase::GameOver)
 	{
 		if (RetryVoteCount >= GetNumPlayers())
@@ -96,7 +85,7 @@ void ANYGameModeStage::OnEnemyKilled()
 {
 	CurrKillCnt++;
 
-	// TODO : 경험치, 골드
+	// TODO: Grant XP and gold.
 
 
 	if (CurrKillCnt >= TargetKillCnt)
@@ -123,15 +112,15 @@ void ANYGameModeStage::StartNextWave()
 			int32 Multiplier = FMath::Max(1, AlivePlayerCnt);
 			TargetKillCnt = (WaveData->BaseTargetKillCnt) * Multiplier;
 
-			for (ANYMonsterSpawner* Spawner : ActiveSpawners)
-				if (Spawner)
+			for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
+				if (SpawnComponent)
 				{
-					Spawner->UpdateSpawnerData(WaveData->MonsterClass, WaveData->SpawnInterval);
+					SpawnComponent->UpdateSpawnerData(WaveData->MonsterClass, WaveData->SpawnInterval);
 				}
 		}
 		else
 		{
-			// TODO : GameClear();
+			// TODO: GameClear();
 
 			// debug
 			GEngine->AddOnScreenDebugMessage(
@@ -203,15 +192,15 @@ void ANYGameModeStage::StartRewardPhase()
 {
 	SetSpawnersActive(false);
 
-	// TODO : 게임을 멈추던지, 무적으로 만들던지, 진행 멈춰야함, 일단 아래처럼 해놓긴 했는데 뭔가 별로같음
+	// Return all active monsters to the pool (fallback: destroy if pool missing).
 	TArray<AActor*> AliveMonsters;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANYMonsterBase::StaticClass(), AliveMonsters);
 
 	for (AActor* Actor : AliveMonsters)
 		if (ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Actor))
 		{
-			if (MonsterPoolManager)
-				MonsterPoolManager->ReturnMonster(Monster);
+			if (MonsterPoolComponent)
+				MonsterPoolComponent->ReturnMonster(Monster);
 			else
 				Monster->Destroy();
 		}
@@ -236,14 +225,14 @@ void ANYGameModeStage::StartRewardPhase()
 
 	RewardedPlayerCnt = 0;
 
-	// TODO : 보상 선택 타임아웃 타이머
+	// TODO: Reward selection timeout timer.
 
 
 }
 
 void ANYGameModeStage::OnPlayerRewarded()
 {
-	// TODO : 플레이어 선택 받아서 적용
+	// TODO: Apply the player's reward choice.
 
 	RewardedPlayerCnt++;
 	if (RewardedPlayerCnt >= GetNumPlayers())
@@ -258,7 +247,7 @@ void ANYGameModeStage::AddRetryVote()
 {
 	RetryVoteCount++;
 
-	// TODO : GameState에 현재 투표수 동기화, UI update
+	// TODO: Replicate retry vote count to GameState for UI.
 	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
 	{
 
@@ -273,22 +262,37 @@ void ANYGameModeStage::AddRetryVote()
 
 }
 
-void ANYGameModeStage::RegisterSpawner(ANYMonsterSpawner* Spawner)
+void ANYGameModeStage::RegisterSpawnComponent(UNYMonsterSpawnComponent* SpawnComponent)
 {
-	if (Spawner && !ActiveSpawners.Contains(Spawner))
+	if (!SpawnComponent || ActiveSpawnComponents.Contains(SpawnComponent))
 	{
-		ActiveSpawners.Add(Spawner);
+		return;
+	}
+
+	ActiveSpawnComponents.Add(SpawnComponent);
+
+	// GameMode BeginPlay can run StartNextWave before level spawners BeginPlay.
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		if (GS->GetGamePhase() == ENYGamePhase::Playing && WaveDataTable && CurrWave > 0)
+		{
+			const FName RowName = FName(*FString::FromInt(CurrWave));
+			if (const FNYWaveDataRow* WaveData = WaveDataTable->FindRow<FNYWaveDataRow>(RowName, TEXT("LateSpawnRegister")))
+			{
+				SpawnComponent->UpdateSpawnerData(WaveData->MonsterClass, WaveData->SpawnInterval);
+			}
+
+			SpawnComponent->StartSpawning();
+		}
 	}
 }
 
 void ANYGameModeStage::SetSpawnersActive(bool bActive)
 {
-	for (ANYMonsterSpawner* Spawner : ActiveSpawners)
-		if (Spawner)
+	for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
+		if (SpawnComponent)
 			if (bActive)
-				Spawner->StartSpawning();
+				SpawnComponent->StartSpawning();
 			else
-				Spawner->StopSpawning();
-
-
+				SpawnComponent->StopSpawning();
 }

@@ -3,9 +3,16 @@ Content/Developers/*
 Content/ThirdParty/*
 Content/Sound/*
 
+# Cursor
+.agents/
+skills-lock.json
+.ignore
 
+# Visual Studio Code
+.vscode/
+*.code-workspace
 
-# Visual Studio 2015 user specific files
+# Visual Studio
 .vs/
 
 # Compiled Object files

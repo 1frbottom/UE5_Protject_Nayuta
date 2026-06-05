@@ -11,7 +11,8 @@
 
 
 class ANYPlayerControllerStage;
-class ANYMonsterPoolManager;
+class UNYMonsterPoolComponent;
+class UNYMonsterSpawnComponent;
 
 USTRUCT(BlueprintType)
 struct FNYWaveDataRow : public FTableRowBase
@@ -83,22 +84,23 @@ protected:
 	int32 RetryVoteCount = 0;
 
 
-	// Spawner
+	// Spawner / pool (server-only via GameMode)
 public:
-	FORCEINLINE ANYMonsterPoolManager* GetMonsterPoolManager() const { return MonsterPoolManager; }
+	FORCEINLINE UNYMonsterPoolComponent* GetMonsterPoolComponent() const { return MonsterPoolComponent; }
 
-	void RegisterSpawner(class ANYMonsterSpawner* Spawner);
+	void RegisterSpawnComponent(UNYMonsterSpawnComponent* SpawnComponent);
 
 
 protected:
-	UPROPERTY(Transient)
-	TObjectPtr<ANYMonsterPoolManager> MonsterPoolManager;
+	/** Default subobject; pre-warms monsters on BeginPlay (server only). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawner")
+	TObjectPtr<UNYMonsterPoolComponent> MonsterPoolComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Spawner")
 	int32 InitialPoolSize = 1000;
 	
 	UPROPERTY(Transient)
-	TArray<ANYMonsterSpawner*> ActiveSpawners;
+	TArray<TObjectPtr<UNYMonsterSpawnComponent>> ActiveSpawnComponents;
 
 	void SetSpawnersActive(bool bIsActive);
 

@@ -13,6 +13,19 @@ class USkeletalMeshComponent;
 class UWidgetComponent;
 class UNYHpBarWidgetMonster;
 
+/** Replicated active/inactive state for pooled monsters (target + spawn snap). */
+USTRUCT()
+struct FMonsterActivationData
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TObjectPtr<AActor> Target;
+
+    UPROPERTY()
+    FVector SpawnLocation;
+};
+
 UCLASS()
 class PROJECTNAYUTA_API ANYMonsterBase : public APawn
 {
@@ -37,7 +50,6 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<USkeletalMeshComponent> SkeletalMeshComp;
 
-        // test
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<class UStaticMeshComponent> SphereComp;
 
@@ -51,7 +63,6 @@ protected:
     UPROPERTY()
     float RandomizedMoveSpeed;
 
-    // Hp
     UPROPERTY(EditAnywhere, Category = "Stats")
     float MaxHp = 100.0f;
 
@@ -62,29 +73,21 @@ protected:
     void OnRep_CurrentHp();
 
 
-// Multiplay
+// Multiplayer
 public:
-    // 서버에서 초기 타겟을 설정해주는 함수
-    /* called by NYMonsterSpawner */
-    void SetTarget(AActor* NewTarget);
-
-    // 데미지 처리 (서버에서만 실행됨)
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+    /** Authority-only: pull from pool and replicate activation to clients. */
     void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
     void DeactivateOnServer();
 
 protected:
-    /* initialized by NYMonsterBase->SerTarget() */
-    UPROPERTY(ReplicatedUsing = OnRep_TargetActor, Transient)
-    TObjectPtr<AActor> TargetActor;
+    UPROPERTY(ReplicatedUsing = OnRep_ActivationData, Transient)
+    FMonsterActivationData ActivationData;
 
     UFUNCTION()
-    virtual void OnRep_TargetActor();   // Activate, DeActivate 대체
+    virtual void OnRep_ActivationData();
 
-    // 클라이언트 로컬 이동용 변수 추가
-    UPROPERTY(Transient)
-    TObjectPtr<AActor> LocalTargetActor;
 
 
 };
