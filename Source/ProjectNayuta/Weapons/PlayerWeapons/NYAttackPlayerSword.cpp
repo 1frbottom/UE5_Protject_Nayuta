@@ -36,13 +36,13 @@ void ANYAttackPlayerSword::BeginPlay()
 
 void ANYAttackPlayerSword::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	// 서버에서만 판정하며, 이미 때린 적은 무시
+	// Only check on the server, ignore already hit enemies
 	if (HasAuthority())
 		if (OtherActor && OtherActor != GetInstigator())
 		{
 			UGameplayStatics::ApplyDamage(OtherActor, CurrentDamage, GetInstigatorController(), this, UDamageType::StaticClass());
 
-			// 관통형이면 그대로 두고, 단일 타겟이면 여기서 Destroy() 호출
+			// If it's a penetrating type, leave it as is, if it's a single target, call Destroy() here
 
 		}
 

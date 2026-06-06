@@ -85,6 +85,9 @@ void ANYGameModeStage::OnEnemyKilled()
 {
 	CurrKillCnt++;
 
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+		GS->ReplicatedKillCnt = CurrKillCnt;
+
 	// TODO: Grant XP and gold.
 
 

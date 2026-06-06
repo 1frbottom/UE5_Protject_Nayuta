@@ -22,8 +22,8 @@ void UNYGameInstance::Init()
         SessionInterface = Subsystem->GetSessionInterface();
         if (SessionInterface.IsValid())
         {
-            // 스팀 초대 전용 델리게이트 바인딩
-            // 상시 대기 상태여야하기 때문
+            // Steam Invitation Only Deligate Binding
+            // It has to be on standby at all times
             SessionUserInviteAcceptedDelegateHandle = SessionInterface->AddOnSessionUserInviteAcceptedDelegate_Handle(
                 FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UNYGameInstance::OnSessionUserInviteAccepted)
             );
@@ -60,7 +60,7 @@ void UNYGameInstance::OnNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENe
     {
         if (APlayerController* PC = GetFirstLocalPlayerController())
         {
-            PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+            PC->ClientTravel("/Game/Levels/LV_MainMenu", TRAVEL_Absolute);
         }
     }
 
@@ -86,7 +86,7 @@ void UNYGameInstance::LeaveSession()
     }
     else
     {
-        // 세션이 없거나 유효하지 않으면 바로 초기화 후 이동
+        // If there is no session or is not valid, reset and move immediately
         CurrentSessionName = FName();
         PendingMaxPlayers = 0;
 
@@ -116,7 +116,7 @@ void UNYGameInstance::HostGame(FName SessionName, int32 MaxPlayers)
     CurrentSessionName = SessionName;
     PendingMaxPlayers = MaxPlayers;
 
-    // 이미 방이 있다면
+    // If already have a room
     if (SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
     {
         SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
@@ -147,7 +147,7 @@ void UNYGameInstance::HostGame(FName SessionName, int32 MaxPlayers)
 
 }
 
-// [Steam Specific] 초대 수락 콜백
+// [Steam Specific] Invitation Accept Callback
 void UNYGameInstance::OnSessionUserInviteAccepted(bool bWasSuccessful, int32 ControllerId, TSharedPtr<const FUniqueNetId> UserId, const FOnlineSessionSearchResult& InviteResult)
 {
     if (!bWasSuccessful || !SessionInterface.IsValid())
@@ -157,7 +157,7 @@ void UNYGameInstance::OnSessionUserInviteAccepted(bool bWasSuccessful, int32 Con
 
     JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(FOnJoinSessionCompleteDelegate::CreateUObject(this, &UNYGameInstance::OnJoinSessionComplete));
 
-    // 초대를 통해 전달받은 세션 정보(InviteResult)로 바로 조인 시도
+    // Try to join immediately using the session information received through the invitation (InviteResult)
     SessionInterface->JoinSession(ControllerId, NAME_GameSession, InviteResult);
 
 

@@ -8,6 +8,8 @@
 #include "Blueprint/UserWidget.h"
 
 #include "Game/NYGameModeStage.h"
+#include "Game/NYGameStateStage.h"
+
 #include "Player/NYPlayerStateStage.h"
 
 
@@ -22,6 +24,27 @@ void ANYPlayerControllerStage::BeginPlay()
 
 }
 
+void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
+{
+    // only local
+    if (!IsLocalController())
+        return;
+    switch (NewPhase)
+    {
+    case ENYGamePhase::Playing:
+        // if needed : reward/gameover widget close, return to Playing UI
+        break;
+    case ENYGamePhase::Rewarding:
+        ShowRewardUI();
+        break;
+    case ENYGamePhase::GameOver:
+        ShowGameOverUI();
+        break;
+    default:
+        break;
+    }
+}
+
 void ANYPlayerControllerStage::SetupInputComponent()
 {
     Super::SetupInputComponent();
@@ -31,19 +54,19 @@ void ANYPlayerControllerStage::SetupInputComponent()
 
 void ANYPlayerControllerStage::TogglePause()
 {
-    // 1. 설정창이 열려있는지 상태를 먼저 기록
+    // 1. Record the status of whether the setting window is open first
     bool bWasSettingOpen = (SettingWidgetRef != nullptr && SettingWidgetRef->IsInViewport());
 
-    // 2. 부모의 설정창 닫기 로직 실행
+    // 2. Execute the parent's setting window close logic
     Super::TogglePause();
 
-    // 3. 만약 설정창을 닫은 거라면 여기서 함수 종료 (P키로 설정창만 닫음)
+    // 3. If the setting window is closed, exit the function here (only close the setting window with the P key)
     if (bWasSettingOpen)
     {
         return;
     }
 
-    // 4. 설정창이 없을 때만 기존의 일시정지 로직 실행
+    // 4. Execute the original pause logic only when the setting window is not open
     UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 
     if (bIsPaused)

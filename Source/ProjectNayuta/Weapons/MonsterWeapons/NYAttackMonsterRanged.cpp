@@ -23,7 +23,7 @@ ANYAttackMonsterRanged::ANYAttackMonsterRanged()
 	ProjectileMovementComp->MaxSpeed = 800.0f;
 	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
 
-	InitialLifeSpan = 5.0f; // 5초 뒤 자동 소멸
+	InitialLifeSpan = 5.0f;
 
 
 }

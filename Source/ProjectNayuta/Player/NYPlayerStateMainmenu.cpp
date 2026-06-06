@@ -34,7 +34,7 @@ void ANYPlayerStateMainmenu::OnRep_PlayerId()
 {
     Super::OnRep_PlayerId();
 
-    // 클라이언트에 PlayerId가 동기화된 직후 UI 새로고침 신호 전송
+        // Send a signal to refresh the UI after PlayerId is synchronized on the client
     if (ANYGameStateMainmenu* GS = Cast<ANYGameStateMainmenu>(GetWorld()->GetGameState()))
     {
         GS->OnPlayerListChangedDelegate.Broadcast();

@@ -26,7 +26,7 @@ void ANYPlayerStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ANYPlayerStateStage, MaxHP);
 
     DOREPLIFETIME(ANYPlayerStateStage, MoveSpeed);
-
+    DOREPLIFETIME(ANYPlayerStateStage, bIsSprinting);
 
 }
 
@@ -37,7 +37,6 @@ void ANYPlayerStateStage::SetPlayerPhase(ENYPlayerPhase NewPhase)
 
     CurrPhase = NewPhase;
 
-    // ∏ÆΩºº≠πˆøÎ
     OnRep_CurrPhase();
 }
 
@@ -93,10 +92,8 @@ void ANYPlayerStateStage::ApplyDamage(float DamageAmount)
 
     CurrHp = FMath::Clamp(CurrHp - DamageAmount, 0.0f, MaxHP);
 
-    // º≠πˆøÎ ºˆµø »£√‚
     OnRep_CurrHp();
 
-    // ƒ≥∏Ø≈Õ ªÁ∏¡
     if (CurrHp <= 0.0f)
     {
         SetPlayerPhase(ENYPlayerPhase::Dead);
@@ -127,7 +124,7 @@ void ANYPlayerStateStage::OnRep_CurrHp()
     {
         float HpPercent = (MaxHP > 0.0f) ? (CurrHp / MaxHP) : 0.0f;
 
-        // ≥ª PC∏È ≥ª Hpbar æ˜µ•¿Ã∆Æ
+        // If it's my PC, update my Hpbar
         if (LocalPC->PlayerState == this)
         {
             LocalPC->UpdatePlayerHpUI(HpPercent);
@@ -164,7 +161,8 @@ void ANYPlayerStateStage::AddExp(int32 InExp)
     {
         CurrExp -= MaxExp;
         CurrPlayerLv++;
-        // ¥Ÿ¿Ω ∞Ê«Ëƒ°≈Î DTø°º≠ ¿–æÓø¿±‚
+
+        // Read the next experience value from the DataTable
 
     }
 
@@ -173,13 +171,12 @@ void ANYPlayerStateStage::AddExp(int32 InExp)
 
 void ANYPlayerStateStage::OnRep_CurrExp()
 {
-    // TODO : PC->HUD ≈Î«— UpdateExpUI(CurrExp / MaxExp), PC¿« UpdatePlayerHpUI√≥∑≥ «œ∏È¥Ô
+    // TODO : Update the UI through PC->HUD UpdateExpUI(CurrExp / MaxExp), same as UpdatePlayerHpUI for PC
+
 
 
 
 }
-
-
 
 void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)
 {
@@ -192,12 +189,37 @@ void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)
 
 void ANYPlayerStateStage::OnRep_MoveSpeed()
 {
-    // ƒ≥∏Ø≈Õ ¡¢±Ÿ«œø© Ω«¡¶¿Ãº” ∫Ø∞Ê
-    if (APawn* Pwn_ref = GetPawn())
+    ApplyMoveSpeedToPawn();
+}
+
+void ANYPlayerStateStage::SetSprinting(bool bSprint)
+{
+    if (!HasAuthority())
+        return;
+    if (CurrPhase != ENYPlayerPhase::Alive)
+        return;
+    if (bIsSprinting == bSprint)
+        return;
+    bIsSprinting = bSprint;
+    OnRep_bIsSprinting(); // Î¶¨Ïä® ÏÑúÎ≤Ñ Ï¶âÏãú Î∞òÏòÅ
+}
+void ANYPlayerStateStage::OnRep_bIsSprinting()
+{
+    ApplyMoveSpeedToPawn();
+}
+
+void ANYPlayerStateStage::ApplyMoveSpeedToPawn()
+{
+    APawn* Pawn_ref = GetPawn();
+    if (!Pawn_ref)
+        return;
+    ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(Pawn_ref);
+    if (!Character)
+        return;
+    float EffectiveSpeed = MoveSpeed;
+    if (bIsSprinting && CurrPhase == ENYPlayerPhase::Alive)
     {
-        if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(Pwn_ref))
-        {
-            Character->GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
-        }
+        EffectiveSpeed += SprintSpeedBonus;
     }
+    Character->GetCharacterMovement()->MaxWalkSpeed = EffectiveSpeed;
 }

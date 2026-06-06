@@ -17,7 +17,7 @@ public:
 	void UpdateHpBar(float InPercent);
 
 protected:
-	// UMG 블루프린트의 ProgressBar 이름과 반드시 동일해야 자동 바인딩
+	// The name of the ProgressBar in the UMG Blueprint must be exactly the same for automatic binding
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> HpProgressBar;
 

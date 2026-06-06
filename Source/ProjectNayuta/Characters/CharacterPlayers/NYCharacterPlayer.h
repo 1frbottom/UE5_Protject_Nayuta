@@ -84,9 +84,7 @@ protected:
 	void StopSprint();
 
 	UFUNCTION(Server, Reliable)
-	void Server_Sprint();
-	UFUNCTION(Server, Reliable)
-	void Server_StopSprint();
+	void Server_SetSprinting(bool bSprint);
 
 	// Jump
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")

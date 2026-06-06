@@ -6,6 +6,7 @@
 #include "ProjectNayuta.h"
 
 #include "Engine/OverlapResult.h"
+#include "Engine/LocalPlayer.h"
 
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
@@ -131,8 +132,7 @@ void ANYCharacterPlayer::InitPlayerState()
 
     if (PS_ref)
     {
-        GetCharacterMovement()->MaxWalkSpeed = PS_ref->GetMoveSpeed();
-
+        PS_ref->ApplyMoveSpeedToPawn();
     }
 }
 
@@ -182,21 +182,21 @@ void ANYCharacterPlayer::Look(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 {
-    if (!PS_ref && PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
         return;
 
     FVector2D MovementVector = Value.Get<FVector2D>();
 
     if (Controller != nullptr)
     {
-        // 컨트롤러(카메라)가 바라보는 방향을 기준으로 전방 및 우측 벡터를 계산
+        // Calculate front and right vectors based on the direction the controller (camera) looks at
         const FRotator Rotation = Controller->GetControlRotation();
         const FRotator YawRotation(0, Rotation.Yaw, 0);
 
         const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
         const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-        // 입력값에 따라 이동
+        // Move according to input value
         AddMovementInput(ForwardDirection, MovementVector.Y);
         AddMovementInput(RightDirection, MovementVector.X);
     }
@@ -204,30 +204,38 @@ void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Sprint()
 {
-    GetCharacterMovement()->MaxWalkSpeed += 250.0f;
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        return;
 
-    if (!HasAuthority())
+    if (HasAuthority())
     {
-        Server_Sprint();
+        PS_ref->SetSprinting(true);
     }
-}
-void ANYCharacterPlayer::Server_Sprint_Implementation()
-{
-    GetCharacterMovement()->MaxWalkSpeed += 250.0f;
+    else
+    {
+        Server_SetSprinting(true);
+    }
 }
 
 void ANYCharacterPlayer::StopSprint()
 {
-    GetCharacterMovement()->MaxWalkSpeed -= 250.0f;
-
-    if (!HasAuthority())
+    if (HasAuthority())
     {
-        Server_StopSprint();
+        if (PS_ref)
+            PS_ref->SetSprinting(false);
+    }
+    else
+    {
+        Server_SetSprinting(false);
     }
 }
-void ANYCharacterPlayer::Server_StopSprint_Implementation()
+
+void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
 {
-    GetCharacterMovement()->MaxWalkSpeed -= 250.0f;
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        PS->SetSprinting(bSprint);
+    }
 }
 
 float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)

@@ -25,9 +25,14 @@ protected:
 
 // UI
 
+    // Phase
+public:
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void HandleGamePhaseChanged(ENYGamePhase NewPhase);
+
     // Hp
 public:
-        // 캐릭터의 체력이 변경될 때 호출할 이벤트, BP_PlayerController에서 HUD 호출해서 업데이트
+       // Event to call when the character's health changes, BP_PlayerController calls HUD to update
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdatePlayerHpUI(float HpPercentage);
 
@@ -36,7 +41,7 @@ public:
 public:
     virtual void TogglePause() override;
 
-        // BP에서 HUD 호출용
+        // Event to call when the pause menu is toggled, BP_PlayerController calls HUD to update
     UFUNCTION(BlueprintImplementableEvent, Category = "UI") 
     void OnTogglePauseMenu();
 

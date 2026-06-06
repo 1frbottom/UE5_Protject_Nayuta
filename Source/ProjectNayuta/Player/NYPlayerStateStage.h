@@ -83,6 +83,13 @@ public:
 	FORCEINLINE float GetMoveSpeed() const { return MoveSpeed; }
 	void AddMoveSpeed(float InMoveSpeed);
 
+	static constexpr float SprintSpeedBonus = 250.f;
+	void SetSprinting(bool bSprint);
+	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
+
+	// MoveSpeed + Sprint Bonus Reflected to Pawn CMC
+	void ApplyMoveSpeedToPawn();
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_MoveSpeed, BlueprintReadOnly, Category = "Stat")
 	float MoveSpeed = 250.0f;
@@ -90,6 +97,11 @@ protected:
 	UFUNCTION()
 	void OnRep_MoveSpeed();
 
+	UPROPERTY(ReplicatedUsing = OnRep_bIsSprinting, BlueprintReadOnly, Category = "Stat")
+	bool bIsSprinting = false;
+
+	UFUNCTION()
+	void OnRep_bIsSprinting();
 
 	// Exp
 public:

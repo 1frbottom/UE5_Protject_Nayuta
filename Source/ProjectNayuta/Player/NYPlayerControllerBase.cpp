@@ -20,7 +20,7 @@ void ANYPlayerControllerBase::BeginPlay()
 {
     Super::BeginPlay();
 
-    // 어느 레벨이든 시스템 공통 IMC(P키 등)를 기본으로 장착
+     // Always equip the system common IMC (P key, etc.) on any level
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
         if (IMC_System)
@@ -34,7 +34,7 @@ void ANYPlayerControllerBase::SetupInputComponent()
 {
     Super::SetupInputComponent();
 
-    // P키를 누르면 공통 가상 함수인 TogglePause가 실행되도록 바인딩
+    // P key binding to call the common virtual function TogglePause
     if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
     {
         if (PauseAction)
@@ -51,7 +51,7 @@ void ANYPlayerControllerBase::SetMouseSensitivity(float NewValue)
 
 void ANYPlayerControllerBase::TogglePause()
 {
-    // [공통 로직] 설정창이 열려있다면 닫고 참조를 초기화함
+    // [Common Logic] If the setting window is open, close it and initialize the reference
     if (SettingWidgetRef && SettingWidgetRef->IsInViewport())
     {
         SettingWidgetRef->RemoveFromParent();

@@ -44,7 +44,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UI")
     virtual void TogglePause();
 
-    // 현재 화면에 떠 있는 설정 위젯 참조
+     // Reference to the setting widget currently displayed on the screen
     UPROPERTY(BlueprintReadWrite, Category = "UI")
     TObjectPtr<UUserWidget> SettingWidgetRef;
 

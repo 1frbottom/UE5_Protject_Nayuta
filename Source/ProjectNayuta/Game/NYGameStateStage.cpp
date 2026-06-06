@@ -22,23 +22,19 @@ void ANYGameStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 void ANYGameStateStage::OnRep_CurrPhase()
 {
+	if (!GetWorld())
+		return;
+
 	// Get Local PC
-	ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetWorld()->GetFirstPlayerController());
-	if (PC)
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		if (CurrPhase == ENYGamePhase::Playing)
-		{
-			// 필요시 웨이브 시작 UI 팝업
-		}
-		else if (CurrPhase == ENYGamePhase::Rewarding)
-		{
-			PC->ShowRewardUI();
+		APlayerController* PC = It->Get();
+		if (!PC || !PC->IsLocalController())
+			continue;
 
-		}
-		else if (CurrPhase == ENYGamePhase::GameOver)
+		if (ANYPlayerControllerStage* StagePC = Cast<ANYPlayerControllerStage>(PC))
 		{
-			PC->ShowGameOverUI();
-
+			StagePC->HandleGamePhaseChanged(CurrPhase);
 		}
 	}
 
@@ -55,7 +51,7 @@ void ANYGameStateStage::SetGamePhase(ENYGamePhase NewPhase)
 	{
 		CurrPhase = NewPhase;
 
-		OnRep_CurrPhase(); // 서버는 OnRep이 자동 호출되지 않으므로 수동 호출
+		OnRep_CurrPhase();
 	}
 }
 

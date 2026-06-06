@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+癤�// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -50,8 +50,8 @@ protected:
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Multiplay")
     int32 PendingMaxPlayers;
 
-    // 공통 델리게이트 핸들
-    // HostGame()에서 바인딩
+    // Common Delegate Handle
+    // HostGame() Binding
     FDelegateHandle CreateSessionCompleteDelegateHandle;
     FDelegateHandle DestroySessionCompleteDelegateHandle;
     FDelegateHandle LeaveSessionCompleteDelegateHandle;
@@ -72,11 +72,11 @@ public:
 protected:
     TSharedPtr<class FOnlineSessionSearch> SessionSearch;
 
-    // FindAndJoinSession()에서 바인딩
+    // FindAndJoinSession() Binding
     FDelegateHandle FindSessionsCompleteDelegateHandle; 
 
-    // OnFindSessionsComplete()에서 바인딩
-    // OnSessionUserInviteAccepted()에서 바인딩
+    // OnFindSessionsComplete() Binding
+    // OnSessionUserInviteAccepted() Binding
     FDelegateHandle JoinSessionCompleteDelegateHandle;
 
     void OnFindSessionsComplete(bool bWasSuccessful);
@@ -87,15 +87,15 @@ protected:
 public:
 
 protected:
-    // 스팀 친구 초대 수락 시 실행될 델리게이트
-    // Init()에서 바인딩
+    // Steam Friend Invitation Accept Delegate
+    // Init() Binding
     FDelegateHandle SessionUserInviteAcceptedDelegateHandle;
 
     /**
-     * @param bWasSuccessful 초대 수락 성공 여부
-     * @param ControllerId 수락한 로컬 컨트롤러 ID
-     * @param UserId 초대 보낸 유저의 ID
-     * @param InviteResult 초대된 세션의 상세 정보
+     * @param bWasSuccessful Invitation Accept Success or Not
+     * @param ControllerId Accepted Local Controller ID
+     * @param UserId Invited User ID
+     * @param InviteResult Invited Session Details
      */
     void OnSessionUserInviteAccepted(bool bWasSuccessful, int32 ControllerId, TSharedPtr<const FUniqueNetId> UserId, const FOnlineSessionSearchResult& InviteResult);
 

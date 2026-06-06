@@ -22,7 +22,7 @@ void UNYWeaponComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 1. 데이터 테이블에서 정보 불러오기
+	// 1. Read information from the DataTable
 	if (WeaponDataTable && !WeaponID.IsNone())
 	{
 		static const FString ContextString(TEXT("Weapon Stat Lookup"));
@@ -91,7 +91,7 @@ void UNYWeaponComponent::FireAttack()
 
 			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActor<ANYAttackPlayerBase>(CurrentAttackClass, SpawnLocation, SpawnRotation, SpawnParams);
 
-			// 스폰 직후 스탯 주입
+			// Inject stats after spawning
 			if (SpawnedAttack)
 			{
 				SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);

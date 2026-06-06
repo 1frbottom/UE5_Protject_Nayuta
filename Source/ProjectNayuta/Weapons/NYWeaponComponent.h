@@ -45,9 +45,9 @@ protected:
 	TObjectPtr<UDataTable> WeaponDataTable;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	FName WeaponID;		// 예: "Weapon_Katana", "Weapon_Fireball"
+	FName WeaponID;		// ex) "Weapon_Katana", "Weapon_Fireball"
 
-	// 실제 인게임에서 사용할 현재 스탯
+	// Current stats used in the actual in-game
 	TSubclassOf<ANYAttackPlayerBase> CurrentAttackClass;
 	float CurrentDamage;
 	float CurrentRange;
