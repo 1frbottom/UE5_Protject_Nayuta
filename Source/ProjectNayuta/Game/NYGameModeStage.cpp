@@ -25,7 +25,12 @@ void ANYGameModeStage::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// GS->SetGamePhase(ENYGamePhase::Waiting);
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		GS->SetGamePhase(ENYGamePhase::Waiting);
+	}
+
+	// First wave starts in TryStartFirstWave() after all connected players have pawns.
 
 	// Pre-warm pool from wave 1 row (server-only; component lives on GameMode).
 	if (MonsterPoolComponent && WaveDataTable)
@@ -37,23 +42,87 @@ void ANYGameModeStage::BeginPlay()
 		}
 	}
 
-	// TODO: Wait for multiplayer ready (player join sync) before calling StartNextWave.
-
-
-	StartNextWave();
+	
 }
 
-void ANYGameModeStage::PostLogin(APlayerController* NewPlayer)
+void ANYGameModeStage::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
-	Super::PostLogin(NewPlayer);
+	Super::HandleStartingNewPlayer_Implementation(NewPlayer);
 
-	AlivePlayerCnt++;
+	if (CurrWave == 0)
+	{
+		TryStartFirstWave();
+	}
+}
 
+int32 ANYGameModeStage::CountPlayersWithPawn() const
+{
+	int32 Count = 0;
+
+	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			if (PS && PS->GetPawn())
+			{
+				Count++;
+			}
+		}
+	}
+
+	return Count;
+}
+
+int32 ANYGameModeStage::CountPlayersInPhase(ENYPlayerPhase Phase) const
+{
+	int32 Count = 0;
+
+	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			if (const ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS))
+			{
+				if (StagePS->GetPlayerPhase() == Phase)
+				{
+					Count++;
+				}
+			}
+		}
+	}
+
+	return Count;
+}
+
+void ANYGameModeStage::TryStartFirstWave()
+{
+	if (CurrWave > 0)
+	{
+		return;
+	}
+
+	const int32 NumPlayers = GetNumPlayers();
+	if (NumPlayers <= 0)
+	{
+		return;
+	}
+
+	if (CountPlayersWithPawn() < NumPlayers)
+	{
+		return;
+	}
+
+	StartNextWave();
 }
 
 void ANYGameModeStage::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
+
+	if (CurrWave == 0)
+	{
+		TryStartFirstWave();
+	}
 
 	if (GetNumPlayers() <= 0)
 		return;
@@ -111,9 +180,8 @@ void ANYGameModeStage::StartNextWave()
 
 		if (WaveData)
 		{
-			// Scale by number of players
-			int32 Multiplier = FMath::Max(1, AlivePlayerCnt);
-			TargetKillCnt = (WaveData->BaseTargetKillCnt) * Multiplier;
+			const int32 Multiplier = FMath::Max(1, GetNumPlayers());
+			TargetKillCnt = WaveData->BaseTargetKillCnt * Multiplier;
 
 			for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
 				if (SpawnComponent)
@@ -143,9 +211,6 @@ void ANYGameModeStage::StartNextWave()
 		GS->ReplicatedTargetKillCnt = TargetKillCnt;
 		GS->ReplicatedKillCnt = 0;
 
-		AlivePlayerCnt = 0;
-
-		// Revive
 		for (APlayerState* PS : GS->PlayerArray)
 		{
 			if (ANYPlayerStateStage* MyPS = Cast<ANYPlayerStateStage>(PS))
@@ -153,10 +218,7 @@ void ANYGameModeStage::StartNextWave()
 				if (MyPS->GetPawn() != nullptr)
 				{
 					MyPS->SetPlayerPhase(ENYPlayerPhase::Alive);
-
 					MyPS->SetCurrHp(MyPS->GetMaxHp());
-
-					AlivePlayerCnt++;
 				}
 			}
 		}
@@ -169,11 +231,9 @@ void ANYGameModeStage::StartNextWave()
 
 void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 {
-	AlivePlayerCnt--;
+	(void)PC_victim;
 
-	// PC_victim->UnPossess();
-
-	if (AlivePlayerCnt <= 0)
+	if (CountPlayersInPhase(ENYPlayerPhase::Alive) <= 0)
 	{
 		GameOver();
 	}

@@ -6,6 +6,8 @@
 #include "Game/NYGameModeBase.h"
 #include "Engine/DataTable.h"
 
+#include "Player/NYPlayerStateStage.h"
+
 #include "NYGameModeStage.generated.h"
 
 
@@ -41,7 +43,7 @@ public:
 	ANYGameModeStage();
 
 	virtual void BeginPlay() override;
-	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
 	// Wave
@@ -57,11 +59,13 @@ public:
 	void OnPlayerDied(ANYPlayerControllerStage* PC_victim);
 
 protected:
-	UPROPERTY()
-	int32 AlivePlayerCnt = 0;
-
 	void StartNextWave();
+	void TryStartFirstWave();
 	void GameOver();
+
+	/** PlayerArray queries — single source of truth instead of manual ++/-- counters. */
+	int32 CountPlayersWithPawn() const;
+	int32 CountPlayersInPhase(ENYPlayerPhase Phase) const;
 
 
 	// Reward
