@@ -13,5 +13,7 @@ UCLASS()
 class PROJECTNAYUTA_API ANYGameModeBase : public AGameModeBase
 {
 	GENERATED_BODY()
-	
+
+public:
+	ANYGameModeBase();
 };

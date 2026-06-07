@@ -3,3 +3,8 @@
 
 #include "Game/NYGameModeBase.h"
 
+ANYGameModeBase::ANYGameModeBase()
+{
+	bUseSeamlessTravel = true;
+}
+
