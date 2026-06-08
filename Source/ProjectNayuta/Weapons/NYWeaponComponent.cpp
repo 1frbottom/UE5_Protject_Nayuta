@@ -5,9 +5,13 @@
 
 #include "ProjectNayuta.h"
 
-#include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
-#include "Characters/CharacterMonsters/NYMonsterBase.h"
 #include "Engine/OverlapResult.h"
+#include "GameFramework/Pawn.h"
+
+#include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Player/NYPlayerStateStage.h"
+
+#include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
 
 
 
@@ -41,14 +45,39 @@ void UNYWeaponComponent::BeginPlay()
 	{
 		GetWorld()->GetTimerManager().SetTimer(AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
 	}
+}
 
+void UNYWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearAllTimersForObject(this);
+	}
 
+	Super::EndPlay(EndPlayReason);
 }
 
 void UNYWeaponComponent::FireAttack()
 {
-	if (!CurrentAttackClass)
+	if (!CurrentAttackClass || !GetOwner()->HasAuthority())
+	{
 		return;
+	}
+
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn)
+	{
+		return;
+	}
+
+	// Server: only fire while the owning player is in the Alive phase.
+	if (ANYPlayerStateStage* PS = OwnerPawn->GetPlayerState<ANYPlayerStateStage>())
+	{
+		if (PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+		{
+			return;
+		}
+	}
 
 	FVector StartLoc = GetOwner()->GetActorLocation();
 	TArray<FOverlapResult> OverlapResults;
@@ -85,18 +114,20 @@ void UNYWeaponComponent::FireAttack()
 			FRotator SpawnRotation = Direction.Rotation();
 			FVector SpawnLocation = StartLoc + (Direction * 50.0f);
 
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = GetOwner();
-			SpawnParams.Instigator = Cast<APawn>(GetOwner());
+			const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
-			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActor<ANYAttackPlayerBase>(CurrentAttackClass, SpawnLocation, SpawnRotation, SpawnParams);
+			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActorDeferred<ANYAttackPlayerBase>(
+				CurrentAttackClass,
+				SpawnTransform,
+				GetOwner(),
+				OwnerPawn,
+				ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
-			// Inject stats after spawning
 			if (SpawnedAttack)
 			{
 				SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);
+				SpawnedAttack->FinishSpawning(SpawnTransform);
 			}
-
 		}
 	}
 }
