@@ -36,6 +36,12 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdatePlayerHpUI(float HpPercentage);
 
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void UpdateExpUI(int32 CurrentExp, int32 MaxExpValue, int32 PlayerLevel);
+
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void UpdateGoldUI(int32 GoldAmount);
+
 
     // Pause
 public:

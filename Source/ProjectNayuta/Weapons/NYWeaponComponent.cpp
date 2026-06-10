@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Weapons/NYWeaponComponent.h"
 
 #include "ProjectNayuta.h"
@@ -11,40 +10,20 @@
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 #include "Player/NYPlayerStateStage.h"
 
+#include "Weapons/NYWeaponDefinition.h"
 #include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
-
-
 
 UNYWeaponComponent::UNYWeaponComponent()
 {
 	SetIsReplicatedByDefault(true);
-
-
 }
 
 void UNYWeaponComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 1. Read information from the DataTable
-	if (WeaponDataTable && !WeaponID.IsNone())
-	{
-		static const FString ContextString(TEXT("Weapon Stat Lookup"));
-		FWeaponStatRow* RowData = WeaponDataTable->FindRow<FWeaponStatRow>(WeaponID, ContextString);
-
-		if (RowData)
-		{
-			CurrentAttackClass = RowData->AttackClass;
-			CurrentDamage = RowData->BaseDamage;
-			CurrentRange = RowData->AttackRange;
-			CurrentCooldown = RowData->Cooldown;
-		}
-	}
-
-	if (GetOwner()->HasAuthority() && CurrentAttackClass)
-	{
-		GetWorld()->GetTimerManager().SetTimer(AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
-	}
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
 }
 
 void UNYWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -55,6 +34,52 @@ void UNYWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void UNYWeaponComponent::SetWeaponDefinition(UNYWeaponDefinition* NewDefinition)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	WeaponDefinition = NewDefinition;
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+}
+
+void UNYWeaponComponent::ApplyWeaponDefinition()
+{
+	CurrentAttackClass = nullptr;
+	CurrentDamage = 0.0f;
+	CurrentRange = 0.0f;
+	CurrentCooldown = 0.0f;
+
+	if (!WeaponDefinition)
+	{
+		return;
+	}
+
+	CurrentAttackClass = WeaponDefinition->AttackClass;
+	CurrentDamage = WeaponDefinition->BaseDamage;
+	CurrentRange = WeaponDefinition->AttackRange;
+	CurrentCooldown = FMath::Max(0.01f, WeaponDefinition->Cooldown);
+}
+
+void UNYWeaponComponent::RefreshAttackTimer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AttackTimer);
+	}
+
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CurrentAttackClass || CurrentCooldown <= 0.0f)
+	{
+		return;
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(
+		AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
 }
 
 void UNYWeaponComponent::FireAttack()
@@ -84,8 +109,7 @@ void UNYWeaponComponent::FireAttack()
 	FCollisionQueryParams CollisionParams;
 	CollisionParams.AddIgnoredActor(GetOwner());
 
-	// true only if block
-	bool bHit = GetWorld()->OverlapMultiByChannel(
+	GetWorld()->OverlapMultiByChannel(
 		OverlapResults, StartLoc, FQuat::Identity, ECC_PLAYERATTACK,
 		FCollisionShape::MakeSphere(CurrentRange), CollisionParams);
 
@@ -99,7 +123,7 @@ void UNYWeaponComponent::FireAttack()
 			ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
 			if (Monster)
 			{
-				float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
+				const float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
 				if (Distance < MinDistance)
 				{
 					MinDistance = Distance;
@@ -110,10 +134,9 @@ void UNYWeaponComponent::FireAttack()
 
 		if (TargetMonster)
 		{
-			FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
-			FRotator SpawnRotation = Direction.Rotation();
-			FVector SpawnLocation = StartLoc + (Direction * 50.0f);
-
+			const FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
+			const FRotator SpawnRotation = Direction.Rotation();
+			const FVector SpawnLocation = StartLoc + (Direction * 50.0f);
 			const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
 			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActorDeferred<ANYAttackPlayerBase>(

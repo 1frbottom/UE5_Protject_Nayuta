@@ -55,6 +55,7 @@ protected:
 
 // Stat
 public:
+    FORCEINLINE FName GetRewardRowID() const { return RewardRowID; }
 
 protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
@@ -63,11 +64,15 @@ protected:
     UPROPERTY()
     float RandomizedMoveSpeed;
 
-    UPROPERTY(EditAnywhere, Category = "Stats")
+    UPROPERTY(EditAnywhere, Category = "Stat")
     float MaxHp = 100.0f;
 
-    UPROPERTY(ReplicatedUsing = OnRep_CurrentHp, EditAnywhere, Category = "Stats")
+    UPROPERTY(ReplicatedUsing = OnRep_CurrentHp, EditAnywhere, Category = "Stat")
     float CurrentHp;
+
+    /** Row name in MonsterRewardDataTable (GameMode). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat")
+    FName RewardRowID = TEXT("Default");
 
     UFUNCTION()
     void OnRep_CurrentHp();

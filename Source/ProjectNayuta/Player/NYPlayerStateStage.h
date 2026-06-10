@@ -43,13 +43,22 @@ protected:
 	void OnRep_CurrPhase();
 
 
-	// Level
+	// Level / currency (persist for the stage run; reset on ServerTravel ?Restart)
 public:
+	FORCEINLINE int32 GetCurrPlayerLv() const { return CurrPlayerLv; }
+	FORCEINLINE int32 GetCurrExp() const { return CurrExp; }
+	FORCEINLINE int32 GetMaxExp() const { return MaxExp; }
+	FORCEINLINE int32 GetCurrGold() const { return CurrGold; }
+
+	void AddExp(int32 InExp);
+	void AddGold(int32 InGold);
+
+	/** Server: reset run stats when a new stage attempt begins. */
+	void ResetRunStats();
 
 protected:
-
-
-
+	void RefreshMaxExpForCurrentLevel();
+	void NotifyLocalStatUI();
 
 	// Hp
 public:
@@ -104,22 +113,24 @@ protected:
 	void OnRep_bIsSprinting();
 
 	// Exp
-public:
-	void AddExp(int32 InExp);
-
-
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
-	int32 MaxExp;
+	int32 MaxExp = 100;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrExp, BlueprintReadOnly, Category = "Stat")
-	int32 CurrExp;
-
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
-	int32 CurrPlayerLv;
-
+	int32 CurrExp = 0;
 	UFUNCTION()
 	void OnRep_CurrExp();
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrPlayerLv, BlueprintReadOnly, Category = "Stat")
+	int32 CurrPlayerLv = 1;
+	UFUNCTION()
+	void OnRep_CurrPlayerLv();
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrGold, BlueprintReadOnly, Category = "Stat")
+	int32 CurrGold = 0;
+	UFUNCTION()
+	void OnRep_CurrGold();
 
 
 	// WeaponComponent

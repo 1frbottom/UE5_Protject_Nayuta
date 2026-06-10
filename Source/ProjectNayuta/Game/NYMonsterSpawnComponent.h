@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "NYMonsterSpawnComponent.generated.h"
 
+
+
 class ANYMonsterBase;
 class ANYCharacterPlayer;
 
@@ -39,7 +41,7 @@ protected:
 	float SpawnRadius = 500.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Spawn")
-	int32 SpawnCountPerTick = 100;
+	int32 SpawnCountPerTick = 10;
 
 private:
 	FTimerHandle SpawnTimerHandle;

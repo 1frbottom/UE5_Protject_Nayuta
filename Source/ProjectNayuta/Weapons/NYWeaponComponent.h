@@ -4,58 +4,41 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Engine/DataTable.h"
 
 #include "NYWeaponComponent.generated.h"
 
 class ANYAttackPlayerBase;
+class UNYWeaponDefinition;
 
-USTRUCT(BlueprintType)
-struct FWeaponStatRow : public FTableRowBase
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	TSubclassOf<ANYAttackPlayerBase> AttackClass;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	float BaseDamage;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	float AttackRange;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	float Cooldown;
-};
-
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTNAYUTA_API UNYWeaponComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UNYWeaponComponent();
+
+	/** Server: swap weapon definition and restart the attack timer. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SetWeaponDefinition(UNYWeaponDefinition* NewDefinition);
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	void ApplyWeaponDefinition();
+	void RefreshAttackTimer();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	TObjectPtr<UDataTable> WeaponDataTable;
+	TObjectPtr<UNYWeaponDefinition> WeaponDefinition;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	FName WeaponID;		// ex) "Weapon_Katana", "Weapon_Fireball"
-
-	// Current stats used in the actual in-game
 	TSubclassOf<ANYAttackPlayerBase> CurrentAttackClass;
-	float CurrentDamage;
-	float CurrentRange;
-	float CurrentCooldown;
+	float CurrentDamage = 0.0f;
+	float CurrentRange = 0.0f;
+	float CurrentCooldown = 0.0f;
 
 	FTimerHandle AttackTimer;
 
 	void FireAttack();
-		
 };

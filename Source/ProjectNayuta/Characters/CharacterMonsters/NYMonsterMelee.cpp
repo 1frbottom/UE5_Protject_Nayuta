@@ -12,8 +12,7 @@
 
 ANYMonsterMelee::ANYMonsterMelee()
 {
-
-
+	RewardRowID = TEXT("Melee");
 }
 
 void ANYMonsterMelee::BeginPlay()

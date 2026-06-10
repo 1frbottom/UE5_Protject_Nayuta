@@ -98,12 +98,9 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
 
     if (CurrentHp <= 0.0f)
     {
-        // TODO: Spawn XP/gem pickup.
-
-
         if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
         {
-            GM->OnEnemyKilled();
+            GM->OnEnemyKilled(EventInstigator, this);
 
             if (GM->GetMonsterPoolComponent())
                 GM->GetMonsterPoolComponent()->ReturnMonster(this);
@@ -119,6 +116,8 @@ void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
 {
     if (HasAuthority())
     {
+        CurrentHp = MaxHp;
+
         SetActorLocation(StartLocation);
         SetNetDormancy(DORM_Awake);
 

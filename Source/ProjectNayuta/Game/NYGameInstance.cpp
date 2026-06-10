@@ -69,7 +69,7 @@ void UNYGameInstance::OnNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENe
 
     //if (APlayerController* PC = GetFirstLocalPlayerController())
     //{
-    //    PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+    //    PC->ClientTravel("/Game/Levels/LV_MainMenu", TRAVEL_Absolute);
     //}
 }
 
@@ -91,7 +91,7 @@ void UNYGameInstance::LeaveSession()
         PendingMaxPlayers = 0;
 
         if (APlayerController* PC = GetFirstLocalPlayerController())
-            PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+            PC->ClientTravel("/Game/Levels/LV_MainMenu", TRAVEL_Absolute);
     }
 }
 
@@ -104,7 +104,7 @@ void UNYGameInstance::OnLeaveSessionComplete(FName SessionName, bool bWasSuccess
     PendingMaxPlayers = 0;
 
     if (APlayerController* PC = GetFirstLocalPlayerController())
-        PC->ClientTravel("/Game/Maps/LV_MainMenu", TRAVEL_Absolute);
+        PC->ClientTravel("/Game/Levels/LV_MainMenu", TRAVEL_Absolute);
 
 }
 

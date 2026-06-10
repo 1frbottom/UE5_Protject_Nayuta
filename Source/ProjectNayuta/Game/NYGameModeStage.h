@@ -6,6 +6,7 @@
 #include "Game/NYGameModeBase.h"
 #include "Engine/DataTable.h"
 
+#include "Game/NYStageDataRows.h"
 #include "Player/NYPlayerStateStage.h"
 
 #include "NYGameModeStage.generated.h"
@@ -13,23 +14,10 @@
 
 
 class ANYPlayerControllerStage;
+class ANYMonsterBase;
 class UNYMonsterPoolComponent;
 class UNYMonsterSpawnComponent;
-
-USTRUCT(BlueprintType)
-struct FNYWaveDataRow : public FTableRowBase
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 BaseTargetKillCnt = 10;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float SpawnInterval = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<class ANYMonsterBase> MonsterClass;
-};
+class UNYStageContentRegistry;
 
 /**
  * 
@@ -51,11 +39,27 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Wave")
 	TObjectPtr<UDataTable> WaveDataTable;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	TObjectPtr<UDataTable> PlayerLevelDataTable;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	TObjectPtr<UDataTable> MonsterRewardDataTable;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	TObjectPtr<UNYStageContentRegistry> StageContentRegistry;
+
+	/** EXP required to advance from InLevel. Returns 0 when the row is missing (max level). */
+	int32 GetRequiredExpForLevel(int32 InLevel) const;
+
+	/** Lookup monster kill rewards by RewardRowID. Returns false when the row is missing. */
+	bool TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const;
+
 	int32 CurrWave = 0;
 	int32 CurrKillCnt = 0;
 	int32 TargetKillCnt = 0;
 
-	void OnEnemyKilled();
+	// Server: kill count + reward grant. Killer may be null (rewards all alive players).
+	void OnEnemyKilled(class AController* KillerController, class ANYMonsterBase* KilledMonster);
 	void OnPlayerDied(ANYPlayerControllerStage* PC_victim);
 
 protected:
@@ -101,12 +105,22 @@ protected:
 	TObjectPtr<UNYMonsterPoolComponent> MonsterPoolComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Spawner")
-	int32 InitialPoolSize = 1000;
+	int32 InitialPoolSize = 100;
 	
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNYMonsterSpawnComponent>> ActiveSpawnComponents;
 
 	void SetSpawnersActive(bool bIsActive);
+
+	TSubclassOf<ANYMonsterBase> ResolveMonsterClass(FName MonsterType) const;
+	void EnsureMonsterPoolForClass(TSubclassOf<ANYMonsterBase> MonsterClass);
+	void ApplyWaveDataToSpawners(const FNYWaveDataRow& WaveData);
+
+	/** Server: apply monster Exp/Gold to killer, or all alive players if killer is invalid. */
+	void GrantKillRewards(AController* KillerController, int32 ExpAmount, int32 GoldAmount);
+
+	UPROPERTY(Transient)
+	TSubclassOf<ANYMonsterBase> CachedPoolMonsterClass;
 
 
 

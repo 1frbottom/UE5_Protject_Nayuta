@@ -2,6 +2,7 @@
 Content/Developers/*
 Content/ThirdParty/*
 Content/Sound/*
+Content/Image/*
 
 # Cursor
 .agents/

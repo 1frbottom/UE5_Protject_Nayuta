@@ -21,6 +21,7 @@ void ANYPlayerStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ANYPlayerStateStage, CurrExp);
     DOREPLIFETIME(ANYPlayerStateStage, MaxExp);
     DOREPLIFETIME(ANYPlayerStateStage, CurrPlayerLv);
+    DOREPLIFETIME(ANYPlayerStateStage, CurrGold);
 
     DOREPLIFETIME(ANYPlayerStateStage, CurrHp);
     DOREPLIFETIME(ANYPlayerStateStage, MaxHP);
@@ -143,39 +144,115 @@ void ANYPlayerStateStage::OnRep_CurrHp()
     }
 }
 
-void ANYPlayerStateStage::AddExp(int32 InExp)
+void ANYPlayerStateStage::RefreshMaxExpForCurrentLevel()
+{
+    MaxExp = 0;
+
+    if (const ANYGameModeStage* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ANYGameModeStage>() : nullptr)
+    {
+        MaxExp = GM->GetRequiredExpForLevel(CurrPlayerLv);
+    }
+}
+
+void ANYPlayerStateStage::ResetRunStats()
 {
     if (!HasAuthority())
+    {
         return;
+    }
 
-    // temp expception
+    CurrPlayerLv = 1;
+    CurrExp = 0;
+    CurrGold = 0;
+    RefreshMaxExpForCurrentLevel();
+
+    OnRep_CurrPlayerLv();
+    OnRep_CurrExp();
+    OnRep_CurrGold();
+}
+
+void ANYPlayerStateStage::AddExp(int32 InExp)
+{
+    if (!HasAuthority() || InExp <= 0)
+    {
+        return;
+    }
+
     if (MaxExp <= 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[ANYPlayerStateStage] MaxExp is 0 or less! Setting to default 100 to prevent infinite loop."));
-        MaxExp = 100;
+        RefreshMaxExpForCurrentLevel();
+    }
+
+    if (MaxExp <= 0)
+    {
+        return;
     }
 
     CurrExp += InExp;
 
-    while (CurrExp >= MaxExp)
+    bool bLeveledUp = false;
+    const ANYGameModeStage* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ANYGameModeStage>() : nullptr;
+
+    while (MaxExp > 0 && CurrExp >= MaxExp)
     {
+        const int32 NextLevel = CurrPlayerLv + 1;
+        const int32 NextMaxExp = GM ? GM->GetRequiredExpForLevel(NextLevel) : 0;
+        if (NextMaxExp <= 0)
+        {
+            CurrExp = MaxExp;
+            break;
+        }
+
         CurrExp -= MaxExp;
-        CurrPlayerLv++;
-
-        // Read the next experience value from the DataTable
-
+        CurrPlayerLv = NextLevel;
+        MaxExp = NextMaxExp;
+        bLeveledUp = true;
     }
 
     OnRep_CurrExp();
+
+    if (bLeveledUp)
+    {
+        OnRep_CurrPlayerLv();
+    }
+}
+
+void ANYPlayerStateStage::AddGold(int32 InGold)
+{
+    if (!HasAuthority() || InGold <= 0)
+    {
+        return;
+    }
+
+    CurrGold += InGold;
+    OnRep_CurrGold();
+}
+
+void ANYPlayerStateStage::NotifyLocalStatUI()
+{
+    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    {
+        if (PC->IsLocalPlayerController())
+        {
+            PC->UpdateExpUI(CurrExp, MaxExp, CurrPlayerLv);
+            PC->UpdateGoldUI(CurrGold);
+        }
+    }
 }
 
 void ANYPlayerStateStage::OnRep_CurrExp()
 {
-    // TODO : Update the UI through PC->HUD UpdateExpUI(CurrExp / MaxExp), same as UpdatePlayerHpUI for PC
+    NotifyLocalStatUI();
+}
 
+void ANYPlayerStateStage::OnRep_CurrPlayerLv()
+{
+    NotifyLocalStatUI();
+}
 
-
-
+void ANYPlayerStateStage::OnRep_CurrGold()
+{
+    NotifyLocalStatUI();
 }
 
 void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)

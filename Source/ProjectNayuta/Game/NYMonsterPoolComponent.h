@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "NYMonsterPoolComponent.generated.h"
 
+
+
 class ANYMonsterBase;
 
 /**

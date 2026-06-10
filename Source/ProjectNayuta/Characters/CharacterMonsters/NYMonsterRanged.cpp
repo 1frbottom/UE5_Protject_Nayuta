@@ -11,10 +11,9 @@
 ANYMonsterRanged::ANYMonsterRanged()
 {
 	LastFireTime = 0.0f;
+	RewardRowID = TEXT("Ranged");
 
 	AttackRangeSqrd = FMath::Square(AttackRange);
-
-
 }
 
 void ANYMonsterRanged::BeginPlay()

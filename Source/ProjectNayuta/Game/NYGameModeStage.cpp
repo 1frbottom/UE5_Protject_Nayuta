@@ -11,6 +11,7 @@
 #include "Game/NYGameStateStage.h"
 #include "Game/NYMonsterSpawnComponent.h"
 #include "Game/NYMonsterPoolComponent.h"
+#include "Game/NYStageContentRegistry.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
@@ -35,10 +36,10 @@ void ANYGameModeStage::BeginPlay()
 	// Pre-warm pool from wave 1 row (server-only; component lives on GameMode).
 	if (MonsterPoolComponent && WaveDataTable)
 	{
-		FNYWaveDataRow* FirstWaveData = WaveDataTable->FindRow<FNYWaveDataRow>(FName(TEXT("1")), TEXT("PoolInitContext"));
-		if (FirstWaveData && FirstWaveData->MonsterClass)
+		const FNYWaveDataRow* FirstWaveData = WaveDataTable->FindRow<FNYWaveDataRow>(FName(TEXT("1")), TEXT("PoolInitContext"));
+		if (FirstWaveData)
 		{
-			MonsterPoolComponent->InitializePool(FirstWaveData->MonsterClass, InitialPoolSize);
+			EnsureMonsterPoolForClass(ResolveMonsterClass(FirstWaveData->MonsterType));
 		}
 	}
 
@@ -150,19 +151,148 @@ void ANYGameModeStage::Logout(AController* Exiting)
 	}
 }
 
-void ANYGameModeStage::OnEnemyKilled()
+void ANYGameModeStage::OnEnemyKilled(AController* KillerController, ANYMonsterBase* KilledMonster)
 {
 	CurrKillCnt++;
 
 	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
 		GS->ReplicatedKillCnt = CurrKillCnt;
+	}
 
-	// TODO: Grant XP and gold.
-
+	if (KilledMonster)
+	{
+		int32 ExpReward = 0;
+		int32 GoldReward = 0;
+		if (TryGetMonsterRewards(KilledMonster->GetRewardRowID(), ExpReward, GoldReward))
+		{
+			GrantKillRewards(KillerController, ExpReward, GoldReward);
+		}
+	}
 
 	if (CurrKillCnt >= TargetKillCnt)
 	{
 		StartRewardPhase();
+	}
+}
+
+int32 ANYGameModeStage::GetRequiredExpForLevel(int32 InLevel) const
+{
+	if (!PlayerLevelDataTable || InLevel <= 0)
+	{
+		return 0;
+	}
+
+	const FName RowName = FName(*FString::FromInt(InLevel));
+	const FNYPlayerLevelRow* Row = PlayerLevelDataTable->FindRow<FNYPlayerLevelRow>(RowName, TEXT("PlayerLevel"));
+	if (!Row || Row->RequiredExp <= 0)
+	{
+		return 0;
+	}
+
+	return Row->RequiredExp;
+}
+
+TSubclassOf<ANYMonsterBase> ANYGameModeStage::ResolveMonsterClass(FName MonsterType) const
+{
+	if (StageContentRegistry)
+	{
+		return StageContentRegistry->ResolveMonsterClass(MonsterType);
+	}
+
+	return nullptr;
+}
+
+void ANYGameModeStage::EnsureMonsterPoolForClass(TSubclassOf<ANYMonsterBase> MonsterClass)
+{
+	if (!MonsterPoolComponent || !MonsterClass || CachedPoolMonsterClass == MonsterClass)
+	{
+		return;
+	}
+
+	MonsterPoolComponent->InitializePool(MonsterClass, InitialPoolSize);
+	CachedPoolMonsterClass = MonsterClass;
+}
+
+void ANYGameModeStage::ApplyWaveDataToSpawners(const FNYWaveDataRow& WaveData)
+{
+	const TSubclassOf<ANYMonsterBase> MonsterClass = ResolveMonsterClass(WaveData.MonsterType);
+	if (!MonsterClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ANYGameModeStage] Unknown MonsterType: %s"), *WaveData.MonsterType.ToString());
+		return;
+	}
+
+	EnsureMonsterPoolForClass(MonsterClass);
+
+	for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
+	{
+		if (SpawnComponent)
+		{
+			SpawnComponent->UpdateSpawnerData(MonsterClass, WaveData.SpawnInterval);
+		}
+	}
+}
+
+bool ANYGameModeStage::TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const
+{
+	OutExp = 0;
+	OutGold = 0;
+
+	if (!MonsterRewardDataTable || RewardRowID.IsNone())
+	{
+		return false;
+	}
+
+	const FNYMonsterRewardRow* Row = MonsterRewardDataTable->FindRow<FNYMonsterRewardRow>(RewardRowID, TEXT("MonsterReward"));
+	if (!Row)
+	{
+		return false;
+	}
+
+	OutExp = FMath::Max(0, Row->ExpReward);
+	OutGold = FMath::Max(0, Row->GoldReward);
+	return OutExp > 0 || OutGold > 0;
+}
+
+void ANYGameModeStage::GrantKillRewards(AController* KillerController, int32 ExpAmount, int32 GoldAmount)
+{
+	if (ExpAmount <= 0 && GoldAmount <= 0)
+	{
+		return;
+	}
+
+	auto GrantToPlayerState = [&](ANYPlayerStateStage* StagePS)
+	{
+		if (!StagePS || StagePS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+		{
+			return;
+		}
+
+		if (ExpAmount > 0)
+		{
+			StagePS->AddExp(ExpAmount);
+		}
+
+		if (GoldAmount > 0)
+		{
+			StagePS->AddGold(GoldAmount);
+		}
+	};
+
+	if (ANYPlayerStateStage* KillerPS = KillerController ? KillerController->GetPlayerState<ANYPlayerStateStage>() : nullptr)
+	{
+		GrantToPlayerState(KillerPS);
+		return;
+	}
+
+	// No valid killer: share rewards with every alive player (co-op fallback).
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			GrantToPlayerState(Cast<ANYPlayerStateStage>(PS));
+		}
 	}
 }
 
@@ -173,6 +303,15 @@ void ANYGameModeStage::StartNextWave()
 	CurrWave++;
 	CurrKillCnt = 0;
 
+	// New run (wave 1): clear per-run exp/gold. Survives across waves; cleared on ServerTravel ?Restart.
+	if (CurrWave == 1)
+		if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+			for (APlayerState* PS : GS->PlayerArray)
+			{
+				if (ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS))
+					StagePS->ResetRunStats();
+			}
+
 	if (WaveDataTable)
 	{
 		FName RowName = FName(*FString::FromInt(CurrWave));
@@ -182,12 +321,7 @@ void ANYGameModeStage::StartNextWave()
 		{
 			const int32 Multiplier = FMath::Max(1, GetNumPlayers());
 			TargetKillCnt = WaveData->BaseTargetKillCnt * Multiplier;
-
-			for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
-				if (SpawnComponent)
-				{
-					SpawnComponent->UpdateSpawnerData(WaveData->MonsterClass, WaveData->SpawnInterval);
-				}
+			ApplyWaveDataToSpawners(*WaveData);
 		}
 		else
 		{
@@ -342,7 +476,7 @@ void ANYGameModeStage::RegisterSpawnComponent(UNYMonsterSpawnComponent* SpawnCom
 			const FName RowName = FName(*FString::FromInt(CurrWave));
 			if (const FNYWaveDataRow* WaveData = WaveDataTable->FindRow<FNYWaveDataRow>(RowName, TEXT("LateSpawnRegister")))
 			{
-				SpawnComponent->UpdateSpawnerData(WaveData->MonsterClass, WaveData->SpawnInterval);
+				ApplyWaveDataToSpawners(*WaveData);
 			}
 
 			SpawnComponent->StartSpawning();
