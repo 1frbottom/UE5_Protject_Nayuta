@@ -61,15 +61,11 @@ int32 ANYGameModeStage::CountPlayersWithPawn() const
 	int32 Count = 0;
 
 	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
-	{
 		for (APlayerState* PS : GS->PlayerArray)
 		{
 			if (PS && PS->GetPawn())
-			{
 				Count++;
-			}
 		}
-	}
 
 	return Count;
 }

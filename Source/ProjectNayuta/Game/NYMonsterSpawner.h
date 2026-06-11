@@ -21,10 +21,6 @@ class PROJECTNAYUTA_API ANYMonsterSpawner : public AActor
 public:
 	ANYMonsterSpawner();
 
-	void StartSpawning();
-	void StopSpawning();
-	void UpdateSpawnerData(TSubclassOf<ANYMonsterBase> NewMonsterClass, float NewInterval);
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawn")
 	TObjectPtr<UNYMonsterSpawnComponent> SpawnComponent;
 };

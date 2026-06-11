@@ -39,6 +39,10 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdateExpUI(int32 CurrentExp, int32 MaxExpValue, int32 PlayerLevel);
 
+    /** Client: fired once when CurrPlayerLv increases (FX, level-up UI). Not called on initial sync or stat reset. */
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void OnPlayerLevelUp(int32 NewLevel);
+
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdateGoldUI(int32 GoldAmount);
 

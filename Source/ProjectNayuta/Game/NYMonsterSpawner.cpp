@@ -10,27 +10,3 @@ ANYMonsterSpawner::ANYMonsterSpawner()
 
 	SpawnComponent = CreateDefaultSubobject<UNYMonsterSpawnComponent>(TEXT("SpawnComponent"));
 }
-
-void ANYMonsterSpawner::StartSpawning()
-{
-	if (SpawnComponent)
-	{
-		SpawnComponent->StartSpawning();
-	}
-}
-
-void ANYMonsterSpawner::StopSpawning()
-{
-	if (SpawnComponent)
-	{
-		SpawnComponent->StopSpawning();
-	}
-}
-
-void ANYMonsterSpawner::UpdateSpawnerData(TSubclassOf<ANYMonsterBase> NewMonsterClass, float NewInterval)
-{
-	if (SpawnComponent)
-	{
-		SpawnComponent->UpdateSpawnerData(NewMonsterClass, NewInterval);
-	}
-}

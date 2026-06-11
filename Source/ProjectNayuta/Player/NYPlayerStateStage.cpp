@@ -166,6 +166,8 @@ void ANYPlayerStateStage::ResetRunStats()
     CurrGold = 0;
     RefreshMaxExpForCurrentLevel();
 
+    LastNotifiedPlayerLevel = CurrPlayerLv;
+
     OnRep_CurrPlayerLv();
     OnRep_CurrExp();
     OnRep_CurrGold();
@@ -228,31 +230,60 @@ void ANYPlayerStateStage::AddGold(int32 InGold)
     OnRep_CurrGold();
 }
 
-void ANYPlayerStateStage::NotifyLocalStatUI()
+void ANYPlayerStateStage::NotifyLocalExpUI()
 {
     if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
     {
         if (PC->IsLocalPlayerController())
         {
             PC->UpdateExpUI(CurrExp, MaxExp, CurrPlayerLv);
+        }
+    }
+}
+
+void ANYPlayerStateStage::NotifyLocalGoldUI()
+{
+    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    {
+        if (PC->IsLocalPlayerController())
+        {
             PC->UpdateGoldUI(CurrGold);
         }
     }
 }
 
+void ANYPlayerStateStage::NotifyLocalLevelUpIfNeeded()
+{
+    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    {
+        if (!PC->IsLocalPlayerController())
+        {
+            return;
+        }
+
+        if (LastNotifiedPlayerLevel > 0 && CurrPlayerLv > LastNotifiedPlayerLevel)
+        {
+            PC->OnPlayerLevelUp(CurrPlayerLv);
+        }
+
+        LastNotifiedPlayerLevel = CurrPlayerLv;
+    }
+}
+
 void ANYPlayerStateStage::OnRep_CurrExp()
 {
-    NotifyLocalStatUI();
+    NotifyLocalExpUI();
 }
 
 void ANYPlayerStateStage::OnRep_CurrPlayerLv()
 {
-    NotifyLocalStatUI();
+    NotifyLocalExpUI();
+    NotifyLocalLevelUpIfNeeded();
 }
 
 void ANYPlayerStateStage::OnRep_CurrGold()
 {
-    NotifyLocalStatUI();
+    NotifyLocalGoldUI();
 }
 
 void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)

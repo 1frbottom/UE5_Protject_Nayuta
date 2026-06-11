@@ -58,7 +58,12 @@ public:
 
 protected:
 	void RefreshMaxExpForCurrentLevel();
-	void NotifyLocalStatUI();
+	void NotifyLocalExpUI();
+	void NotifyLocalGoldUI();
+	void NotifyLocalLevelUpIfNeeded();
+
+	/** Local-only: suppresses false OnPlayerLevelUp on first replicate / after ResetRunStats. */
+	int32 LastNotifiedPlayerLevel = 0;
 
 	// Hp
 public:
@@ -75,12 +80,12 @@ public:
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
 	//float MaxHP = 100.0f;
-	float MaxHP = 10000000.0f;
+	float MaxHP = 100.0f;
 
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrHp, BlueprintReadOnly, Category = "Stat")
 	//float CurrHp = 100.0f;
-	float CurrHp = 10000000.0f;
+	float CurrHp = 100.0f;
 
 
 	UFUNCTION()
