@@ -18,6 +18,12 @@
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYAttackMonsterRanged.gen.cpp.obj"
 	},
 	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYAttackPlayerAxe.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYAttackPlayerAxe.gen.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYAttackPlayerAxe.gen.cpp.obj"
+	},
+	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYAttackPlayerBase.gen.cpp",
 		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYAttackPlayerBase.gen.cpp.obj.rsp\"",
 		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
@@ -90,6 +96,12 @@
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterBase.gen.cpp.obj"
 	},
 	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYMonsterDefinition.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterDefinition.gen.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterDefinition.gen.cpp.obj"
+	},
+	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYMonsterMelee.gen.cpp",
 		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterMelee.gen.cpp.obj.rsp\"",
 		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
@@ -156,10 +168,28 @@
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYPlayerStateStage.gen.cpp.obj"
 	},
 	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYStageContentRegistry.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYStageContentRegistry.gen.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYStageContentRegistry.gen.cpp.obj"
+	},
+	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYStageDataRows.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYStageDataRows.gen.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYStageDataRows.gen.cpp.obj"
+	},
+	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYWeaponComponent.gen.cpp",
 		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponComponent.gen.cpp.obj.rsp\"",
 		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponComponent.gen.cpp.obj"
+	},
+	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/NYWeaponDefinition.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponDefinition.gen.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponDefinition.gen.cpp.obj"
 	},
 	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/UnrealEditor/Inc/ProjectNayuta/UHT/ProjectNayuta.init.gen.cpp",
@@ -234,6 +264,12 @@
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYGameStateStage.cpp.obj"
 	},
 	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Game/NYMonsterDefinition.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterDefinition.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterDefinition.cpp.obj"
+	},
+	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Game/NYMonsterPoolComponent.cpp",
 		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterPoolComponent.cpp.obj.rsp\"",
 		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
@@ -250,6 +286,12 @@
 		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterSpawner.cpp.obj.rsp\"",
 		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYMonsterSpawner.cpp.obj"
+	},
+	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Game/NYStageContentRegistry.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYStageContentRegistry.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYStageContentRegistry.cpp.obj"
 	},
 	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Player/NYPlayerControllerBase.cpp",
@@ -322,6 +364,18 @@
 		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponComponent.cpp.obj.rsp\"",
 		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
 		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponComponent.cpp.obj"
+	},
+	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Weapons/NYWeaponDefinition.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponDefinition.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYWeaponDefinition.cpp.obj"
+	},
+	{
+		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Weapons/PlayerWeapons/NYAttackPlayerAxe.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYAttackPlayerAxe.cpp.obj.rsp\"",
+		"directory": "C:/Program Files/Epic Games/UE_5.4/Engine/Source",
+		"output": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectNayuta/NYAttackPlayerAxe.cpp.obj"
 	},
 	{
 		"file": "D:/BackUp/Study/CS/SourceTree/ProjectNayuta/Source/ProjectNayuta/Weapons/PlayerWeapons/NYAttackPlayerBase.cpp",
