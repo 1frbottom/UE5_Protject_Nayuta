@@ -43,6 +43,9 @@ protected:
 
 
 // Component
+public:
+    FORCEINLINE UCapsuleComponent* GetCapsuleComponent() const { return CapsuleComp; }
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<UCapsuleComponent> CapsuleComp;

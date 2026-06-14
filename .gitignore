@@ -1,4 +1,4 @@
-# customized
+# UE customized
 Content/Developers/*
 Content/ThirdParty/*
 Content/Sound/*
@@ -9,6 +9,9 @@ Content/Image/*
 skills-lock.json
 .ignore
 .cursor
+
+# C/C++
+compile_commands.json
 
 # Visual Studio Code
 .vscode/
@@ -88,8 +91,4 @@ Intermediate/*
 Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
-<<<<<<< HEAD
 DerivedDataCache/*
-=======
-DerivedDataCache/*
->>>>>>> 62fd68c3b62d6ed22b6e953475d4109794f09ac1

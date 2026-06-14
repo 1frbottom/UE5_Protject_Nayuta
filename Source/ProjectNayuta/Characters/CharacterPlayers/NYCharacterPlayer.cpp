@@ -26,13 +26,14 @@
 #include "Player/NYPlayerControllerStage.h"
 #include "Player/NYPlayerStateStage.h"
 
-#include "Weapons/NYAttackBase.h"
 #include "Weapons/NYWeaponComponent.h"
 
 
 
 ANYCharacterPlayer::ANYCharacterPlayer()
 {
+    PrimaryActorTick.bCanEverTick = true;
+
     // Camera
     SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
     SpringArmComp->SetupAttachment(RootComponent);
@@ -81,6 +82,116 @@ void ANYCharacterPlayer::BeginPlay()
 
 }
 
+void ANYCharacterPlayer::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    ResolveMonsterSoftCollision();
+}
+
+void ANYCharacterPlayer::ResolveMonsterSoftCollision()
+{
+    if (!PS_ref)
+    {
+        PS_ref = GetPlayerState<ANYPlayerStateStage>();
+    }
+
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        return;
+
+    const UCapsuleComponent* PlayerCapsule = GetCapsuleComponent();
+    if (!PlayerCapsule || !PlayerCapsule->IsCollisionEnabled())
+        return;
+
+    UWorld* World = GetWorld();
+    if (!World)
+        return;
+
+    const float PlayerRadius = PlayerCapsule->GetScaledCapsuleRadius();
+    const float QueryRadius = PlayerRadius + 50.0f + MonsterSeparationQueryPadding;
+
+    TArray<FOverlapResult> OverlapResults;
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(MonsterSoftSeparation), false, this);
+
+    FCollisionObjectQueryParams ObjectQueryParams;
+    ObjectQueryParams.AddObjectTypesToQuery(ECC_MONSTER);
+
+    World->OverlapMultiByObjectType(
+        OverlapResults,
+        GetActorLocation(),
+        FQuat::Identity,
+        ObjectQueryParams,
+        FCollisionShape::MakeSphere(QueryRadius),
+        QueryParams);
+
+    if (OverlapResults.IsEmpty())
+        return;
+
+    const FVector PlayerLocation = GetActorLocation();
+    const float PlayerPushWeight = GetLastMovementInputVector().SizeSquared2D() > KINDA_SMALL_NUMBER
+        ? PlayerPushWeightWhileMoving
+        : PlayerPushWeightWhileIdle;
+
+    FVector AccumulatedPlayerOffset = FVector::ZeroVector;
+
+    for (const FOverlapResult& Result : OverlapResults)
+    {
+        ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
+        if (!Monster || !Monster->IsActorTickEnabled())
+            continue;
+
+        const UCapsuleComponent* MonsterCapsule = Monster->GetCapsuleComponent();
+        if (!MonsterCapsule)
+            continue;
+
+        FVector Separation = Monster->GetActorLocation() - PlayerLocation;
+        Separation.Z = 0.0f;
+
+        const float DistSq = Separation.SizeSquared2D();
+        const float MinDist = PlayerRadius + MonsterCapsule->GetScaledCapsuleRadius();
+
+        if (DistSq >= FMath::Square(MinDist))
+            continue;
+
+        FVector PushDir;
+        float Penetration = MinDist;
+
+        if (DistSq < KINDA_SMALL_NUMBER)
+        {
+            PushDir = FVector(FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-1.0f, 1.0f), 0.0f).GetSafeNormal();
+        }
+        else
+        {
+            const float Dist = FMath::Sqrt(DistSq);
+            PushDir = Separation / Dist;
+            Penetration = MinDist - Dist;
+        }
+
+        const float MonsterPushWeight = 1.0f - PlayerPushWeight;
+        const FVector MonsterOffset = PushDir * Penetration * MonsterPushWeight;
+        const FVector PlayerOffset = -PushDir * Penetration * PlayerPushWeight;
+
+        Monster->AddActorWorldOffset(MonsterOffset, true);
+        AccumulatedPlayerOffset += PlayerOffset;
+    }
+
+    if (!AccumulatedPlayerOffset.IsNearlyZero() && HasAuthority())
+    {
+        if (MaxPlayerSeparationPerTick > 0.0f)
+        {
+            AccumulatedPlayerOffset = AccumulatedPlayerOffset.GetClampedToMaxSize(MaxPlayerSeparationPerTick);
+        }
+
+        FHitResult Hit;
+        GetCharacterMovement()->SafeMoveUpdatedComponent(
+            AccumulatedPlayerOffset,
+            GetActorRotation(),
+            true,
+            Hit);
+    }
+}
+
 // after possessed, server only
 void ANYCharacterPlayer::PossessedBy(AController* NewController)
 {
@@ -96,6 +207,8 @@ void ANYCharacterPlayer::PossessedBy(AController* NewController)
 void ANYCharacterPlayer::PawnClientRestart()
 {
     Super::PawnClientRestart();
+
+    InitPlayerState();
 
     PC_ref = Cast<ANYPlayerControllerStage>(GetController());
     // add IMC into PlayerController

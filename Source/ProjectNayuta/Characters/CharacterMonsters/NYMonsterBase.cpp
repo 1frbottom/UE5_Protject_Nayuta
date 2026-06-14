@@ -7,11 +7,8 @@
 
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
-
-#include "Components/WidgetComponent.h"
-
-#include "UI/NYHpBarWidgetMonster.h"
 
 #include "Game/NYGameModeStage.h"
 #include "Game/NYMonsterPoolComponent.h"
@@ -73,7 +70,7 @@ void ANYMonsterBase::Tick(float DeltaTime)
         Direction.Y += FMath::RandRange(-0.1f, 0.1f);
         Direction.Normalize();
 
-        AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, false);
+        AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, true);
 
         FRotator TargetRotation = Direction.Rotation();
         SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));

@@ -25,6 +25,8 @@ class PROJECTNAYUTA_API ANYCharacterPlayer : public ACharacter
 public:
 	ANYCharacterPlayer();
 
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -99,6 +101,25 @@ public:
 	void Revive();
 
 protected:
+	/** Push player and nearby monsters apart when capsules overlap (requires Player-Monster Overlap in collision presets). */
+	void ResolveMonsterSoftCollision();
+
+	/** Extra radius added to the overlap query beyond the player capsule. */
+	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
+	float MonsterSeparationQueryPadding = 10.0f;
+
+	/** Player share of depenetration while moving (monster gets the rest). */
+	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
+	float PlayerPushWeightWhileMoving = 0.25f;
+
+	/** Player share of depenetration while idle (monster swarm can push the player). */
+	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
+	float PlayerPushWeightWhileIdle = 0.45f;
+
+	/** Cap total player displacement per frame to avoid spikes when many monsters overlap. */
+	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
+	float MaxPlayerSeparationPerTick = 8.0f;
+
 
 
 // Weapon

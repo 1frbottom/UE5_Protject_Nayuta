@@ -272,6 +272,8 @@ void ANYPlayerStateStage::NotifyLocalLevelUpIfNeeded()
 
 void ANYPlayerStateStage::OnRep_CurrExp()
 {
+
+
     NotifyLocalExpUI();
 }
 
