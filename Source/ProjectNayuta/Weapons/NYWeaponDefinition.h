@@ -9,7 +9,7 @@
 
 class ANYAttackPlayerBase;
 
-/** Replaces DT_WeaponStat — holds class refs and combat tuning in one asset. */
+/** Base weapon identity and class refs. Per-level tuning lives in DT_WeaponLevel. */
 UCLASS(BlueprintType)
 class PROJECTNAYUTA_API UNYWeaponDefinition : public UDataAsset
 {
@@ -18,6 +18,10 @@ class PROJECTNAYUTA_API UNYWeaponDefinition : public UDataAsset
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FText DisplayName;
+
+	/** Key into WeaponLevelDataTable rows (e.g. "Sword", "Axe"). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	FName WeaponID;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<ANYAttackPlayerBase> AttackClass;

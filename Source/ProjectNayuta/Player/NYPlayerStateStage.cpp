@@ -168,6 +168,11 @@ void ANYPlayerStateStage::ResetRunStats()
 
     LastNotifiedPlayerLevel = CurrPlayerLv;
 
+    if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn()))
+    {
+        Character->ResetWeaponForNewRun();
+    }
+
     OnRep_CurrPlayerLv();
     OnRep_CurrExp();
     OnRep_CurrGold();

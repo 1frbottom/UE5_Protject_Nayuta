@@ -386,3 +386,11 @@ void ANYCharacterPlayer::Revive()
 
 }
 
+void ANYCharacterPlayer::ResetWeaponForNewRun()
+{
+    if (DefaultWeaponComp)
+    {
+        DefaultWeaponComp->ResetWeaponLevel();
+    }
+}
+

@@ -123,6 +123,9 @@ protected:
 
 
 // Weapon
+public:
+	void ResetWeaponForNewRun();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<UNYWeaponComponent> DefaultWeaponComp;

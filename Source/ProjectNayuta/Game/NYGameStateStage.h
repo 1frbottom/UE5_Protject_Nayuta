@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Game/NYGameStateBase.h"
+#include "Engine/DataTable.h"
+
 #include "NYGameStateStage.generated.h"
 
 
@@ -51,6 +53,10 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Info")
 	int32 ReplicatedTargetKillCnt = 0;
+
+	/** Shared stage config — readable on server and clients (not replicated; set per map). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Data")
+	TObjectPtr<UDataTable> WeaponLevelDataTable;
 
 
 

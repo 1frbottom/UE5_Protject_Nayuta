@@ -7,6 +7,8 @@
 
 #include "NYStageDataRows.generated.h"
 
+
+
 /** Row name = player level (e.g. "1", "2"). RequiredExp = EXP to reach the next level. */
 USTRUCT(BlueprintType)
 struct FNYPlayerLevelRow : public FTableRowBase
@@ -44,4 +46,27 @@ struct FNYMonsterRewardRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
 	int32 GoldReward = 5;
+};
+
+/** Row name = "{WeaponID}_{Level}" (e.g. "Sword_1"). Lookup by WeaponID + Level columns. */
+USTRUCT(BlueprintType)
+struct FNYWeaponLevelRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	FName WeaponID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	int32 Level = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	float DamageMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	float RangeMultiplier = 1.0f;
+
+	/** Applied to Cooldown — lower values mean faster attacks. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	float CooldownMultiplier = 1.0f;
 };

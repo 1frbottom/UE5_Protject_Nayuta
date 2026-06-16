@@ -54,6 +54,12 @@ public:
 	/** Lookup monster kill rewards by RewardRowID. Returns false when the row is missing. */
 	bool TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const;
 
+	/** Highest Level row for WeaponID in WeaponLevelDataTable. Returns 1 when no rows exist. */
+	int32 GetMaxWeaponLevel(FName WeaponID) const;
+
+	/** Lookup per-level multipliers by WeaponID + Level. Returns false when the row is missing. */
+	bool TryGetWeaponLevelRow(FName WeaponID, int32 Level, FNYWeaponLevelRow& OutRow) const;
+
 	int32 CurrWave = 0;
 	int32 CurrKillCnt = 0;
 	int32 TargetKillCnt = 0;

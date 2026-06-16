@@ -14,6 +14,8 @@
 #include "Game/NYStageContentRegistry.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Game/NYGameStateStage.h"
+#include "Weapons/NYWeaponLevelLibrary.h"
 
 
 
@@ -187,6 +189,18 @@ int32 ANYGameModeStage::GetRequiredExpForLevel(int32 InLevel) const
 	}
 
 	return Row->RequiredExp;
+}
+
+int32 ANYGameModeStage::GetMaxWeaponLevel(FName WeaponID) const
+{
+	const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
+	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID);
+}
+
+bool ANYGameModeStage::TryGetWeaponLevelRow(FName WeaponID, int32 Level, FNYWeaponLevelRow& OutRow) const
+{
+	const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
+	return NYWeaponLevel::TryGetRow(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID, Level, OutRow);
 }
 
 TSubclassOf<ANYMonsterBase> ANYGameModeStage::ResolveMonsterClass(FName MonsterType) const
