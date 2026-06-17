@@ -273,8 +273,8 @@ void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
         EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
         EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
-
-
+        // Weapon swap
+        EnhancedInputComponent->BindAction(WeaponSwapAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::SwapWeaponSlots);
     }
 
 
@@ -384,6 +384,42 @@ void ANYCharacterPlayer::Revive()
 
     // stop dead animation?
 
+}
+
+void ANYCharacterPlayer::SwapWeaponSlots()
+{
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    {
+        return;
+    }
+
+    if (HasAuthority())
+    {
+        if (DefaultWeaponComp)
+        {
+            DefaultWeaponComp->SwapWeaponSlots();
+        }
+    }
+    else
+    {
+        Server_SwapWeaponSlots();
+    }
+}
+
+void ANYCharacterPlayer::Server_SwapWeaponSlots_Implementation()
+{
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        if (PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        {
+            return;
+        }
+    }
+
+    if (DefaultWeaponComp)
+    {
+        DefaultWeaponComp->SwapWeaponSlots();
+    }
 }
 
 void ANYCharacterPlayer::ResetWeaponForNewRun()

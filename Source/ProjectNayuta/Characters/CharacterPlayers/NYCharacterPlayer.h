@@ -92,6 +92,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
 
+	// Weapon swap
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> WeaponSwapAction;
+	void SwapWeaponSlots();
+
+	UFUNCTION(Server, Reliable, Category = "Weapon")
+	void Server_SwapWeaponSlots();
+
 
 // Stat
 public:

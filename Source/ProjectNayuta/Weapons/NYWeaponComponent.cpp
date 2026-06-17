@@ -16,8 +16,6 @@
 #include "Weapons/NYWeaponLevelLibrary.h"
 #include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
 
-
-
 UNYWeaponComponent::UNYWeaponComponent()
 {
 	SetIsReplicatedByDefault(true);
@@ -27,7 +25,8 @@ void UNYWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UNYWeaponComponent, CurrentWeaponLevel);
+	DOREPLIFETIME(UNYWeaponComponent, PrimarySlot);
+	DOREPLIFETIME(UNYWeaponComponent, SecondarySlot);
 }
 
 void UNYWeaponComponent::BeginPlay()
@@ -56,15 +55,45 @@ void UNYWeaponComponent::SetWeaponDefinition(UNYWeaponDefinition* NewDefinition)
 		return;
 	}
 
-	WeaponDefinition = NewDefinition;
-	CurrentWeaponLevel = 1;
+	PrimarySlot.Definition = NewDefinition;
+	PrimarySlot.Level = 1;
 	ApplyWeaponDefinition();
 	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
 }
 
-int32 UNYWeaponComponent::GetMaxWeaponLevel() const
+void UNYWeaponComponent::SetSecondaryWeaponDefinition(UNYWeaponDefinition* NewDefinition)
 {
-	if (!WeaponDefinition || WeaponDefinition->WeaponID.IsNone())
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	SecondarySlot.Definition = NewDefinition;
+	SecondarySlot.Level = 1;
+	NotifyWeaponSlotsChanged();
+}
+
+void UNYWeaponComponent::SwapWeaponSlots()
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	Swap(PrimarySlot, SecondarySlot);
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
+}
+
+int32 UNYWeaponComponent::GetMaxWeaponLevelForSlot(const FNYWeaponSlot& Slot) const
+{
+	if (!Slot.Definition || Slot.Definition->WeaponID.IsNone())
 	{
 		return 1;
 	}
@@ -72,12 +101,17 @@ int32 UNYWeaponComponent::GetMaxWeaponLevel() const
 	const UWorld* World = GetWorld();
 	const ANYGameStateStage* GS = World ? World->GetGameState<ANYGameStateStage>() : nullptr;
 
-	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, WeaponDefinition->WeaponID);
+	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, Slot.Definition->WeaponID);
+}
+
+int32 UNYWeaponComponent::GetMaxWeaponLevel() const
+{
+	return GetMaxWeaponLevelForSlot(PrimarySlot);
 }
 
 bool UNYWeaponComponent::CanLevelUpWeapon() const
 {
-	return WeaponDefinition && CurrentWeaponLevel < GetMaxWeaponLevel();
+	return PrimarySlot.Definition && PrimarySlot.Level < GetMaxWeaponLevel();
 }
 
 bool UNYWeaponComponent::LevelUpWeapon()
@@ -88,11 +122,11 @@ bool UNYWeaponComponent::LevelUpWeapon()
 		return false;
 	}
 
-	CurrentWeaponLevel++;
-	
+	PrimarySlot.Level++;
 	ApplyWeaponDefinition();
 	RefreshAttackTimer();
 	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
 
 	return true;
 }
@@ -105,26 +139,39 @@ void UNYWeaponComponent::ResetWeaponLevel()
 		return;
 	}
 
-	if (CurrentWeaponLevel == 1)
+	const bool bPrimaryNeedsReset = PrimarySlot.Level != 1;
+	const bool bSecondaryNeedsReset = SecondarySlot.Definition != nullptr || SecondarySlot.Level != 1;
+
+	if (!bPrimaryNeedsReset && !bSecondaryNeedsReset)
 	{
 		return;
 	}
 
-	CurrentWeaponLevel = 1;
+	PrimarySlot.Level = 1;
+	SecondarySlot.Definition = nullptr;
+	SecondarySlot.Level = 1;
 	ApplyWeaponDefinition();
 	RefreshAttackTimer();
 	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
 }
 
-void UNYWeaponComponent::OnRep_CurrentWeaponLevel()
+void UNYWeaponComponent::OnRep_WeaponSlots()
 {
 	ApplyWeaponDefinition();
+	RefreshAttackTimer();
 	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
 }
 
 void UNYWeaponComponent::NotifyWeaponLevelChanged()
 {
-	OnWeaponLevelChanged.Broadcast(CurrentWeaponLevel);
+	OnWeaponLevelChanged.Broadcast(PrimarySlot.Level);
+}
+
+void UNYWeaponComponent::NotifyWeaponSlotsChanged()
+{
+	OnWeaponSlotsChanged.Broadcast();
 }
 
 void UNYWeaponComponent::ApplyWeaponDefinition()
@@ -134,7 +181,7 @@ void UNYWeaponComponent::ApplyWeaponDefinition()
 	CurrentRange = 0.0f;
 	CurrentCooldown = 0.0f;
 
-	if (!WeaponDefinition)
+	if (!PrimarySlot.Definition)
 	{
 		return;
 	}
@@ -144,18 +191,19 @@ void UNYWeaponComponent::ApplyWeaponDefinition()
 	const ANYGameStateStage* GS = World ? World->GetGameState<ANYGameStateStage>() : nullptr;
 	const UDataTable* WeaponLevelTable = GS ? GS->WeaponLevelDataTable : nullptr;
 
-	if (!NYWeaponLevel::TryGetRow(WeaponLevelTable, WeaponDefinition->WeaponID, CurrentWeaponLevel, LevelRow))
+	if (!NYWeaponLevel::TryGetRow(
+		WeaponLevelTable, PrimarySlot.Definition->WeaponID, PrimarySlot.Level, LevelRow))
 	{
 		LevelRow.DamageMultiplier = 1.0f;
 		LevelRow.RangeMultiplier = 1.0f;
 		LevelRow.CooldownMultiplier = 1.0f;
 	}
 
-	CurrentAttackClass = WeaponDefinition->AttackClass;
-	CurrentDamage = WeaponDefinition->BaseDamage * LevelRow.DamageMultiplier;
-	CurrentRange = WeaponDefinition->AttackRange * LevelRow.RangeMultiplier;
+	CurrentAttackClass = PrimarySlot.Definition->AttackClass;
+	CurrentDamage = PrimarySlot.Definition->BaseDamage * LevelRow.DamageMultiplier;
+	CurrentRange = PrimarySlot.Definition->AttackRange * LevelRow.RangeMultiplier;
 	CurrentCooldown = FMath::Max(
-		0.01f, WeaponDefinition->Cooldown * LevelRow.CooldownMultiplier);
+		0.01f, PrimarySlot.Definition->Cooldown * LevelRow.CooldownMultiplier);
 }
 
 void UNYWeaponComponent::RefreshAttackTimer()
@@ -246,3 +294,4 @@ void UNYWeaponComponent::FireAttack()
 		}
 	}
 }
+
