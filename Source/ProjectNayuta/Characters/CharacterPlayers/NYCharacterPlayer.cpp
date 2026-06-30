@@ -68,6 +68,13 @@ ANYCharacterPlayer::ANYCharacterPlayer()
 
 }
 
+void ANYCharacterPlayer::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    ResolveMonsterSoftCollision();
+}
+
 void ANYCharacterPlayer::BeginPlay()
 {
 	Super::BeginPlay();
@@ -82,11 +89,238 @@ void ANYCharacterPlayer::BeginPlay()
 
 }
 
-void ANYCharacterPlayer::Tick(float DeltaTime)
+// after possessed, server only
+void ANYCharacterPlayer::PossessedBy(AController* NewController)
 {
-    Super::Tick(DeltaTime);
+    Super::PossessedBy(NewController);
 
-    ResolveMonsterSoftCollision();
+    InitPlayerState();
+
+    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
+
+}
+
+// after possessed, client only 
+void ANYCharacterPlayer::PawnClientRestart()
+{
+    Super::PawnClientRestart();
+
+    InitPlayerState();
+
+    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
+    // add IMC into PlayerController
+    if (PC_ref)
+    {
+        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC_ref->GetLocalPlayer()))
+        {
+            if (DefaultMappingContext)
+            {
+                Subsystem->AddMappingContext(DefaultMappingContext, 0);
+            }
+        }
+    }
+
+}
+
+void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+
+}
+
+
+// PlayerState
+void ANYCharacterPlayer::OnRep_PlayerState()
+{
+    Super::OnRep_PlayerState();
+
+    InitPlayerState();
+}
+
+void ANYCharacterPlayer::InitPlayerState()
+{
+    PS_ref = GetPlayerState<ANYPlayerStateStage>();
+
+    if (PS_ref)
+    {
+        PS_ref->ApplyMoveSpeedToPawn();
+    }
+}
+
+
+// Input
+void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+
+
+    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        // Look
+        EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ANYCharacterPlayer::Look);
+
+        // Move
+        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ANYCharacterPlayer::Move);
+
+        // Sprint
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::Sprint);
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ANYCharacterPlayer::StopSprint);
+
+        // Jump
+        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+
+        // Weapon swap
+        EnhancedInputComponent->BindAction(WeaponSwapAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::SwapWeaponSlots);
+    }
+
+
+}
+
+void ANYCharacterPlayer::Look(const FInputActionValue& Value)
+{
+    FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+    if (PC_ref)
+    {
+        float Sensitivity = PC_ref->GetMouseSensitivity();
+
+        AddControllerYawInput(LookAxisVector.X * Sensitivity);
+        AddControllerPitchInput(LookAxisVector.Y * Sensitivity);
+    }
+}
+
+void ANYCharacterPlayer::Move(const FInputActionValue& Value)
+{
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        return;
+
+    FVector2D MovementVector = Value.Get<FVector2D>();
+
+    if (Controller != nullptr)
+    {
+        // Calculate front and right vectors based on the direction the controller (camera) looks at
+        const FRotator Rotation = Controller->GetControlRotation();
+        const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+        const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+        const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+        // Move according to input value
+        AddMovementInput(ForwardDirection, MovementVector.Y);
+        AddMovementInput(RightDirection, MovementVector.X);
+    }
+}
+
+void ANYCharacterPlayer::Sprint()
+{
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        return;
+
+    if (HasAuthority())
+    {
+        PS_ref->SetSprinting(true);
+    }
+    else
+    {
+        Server_SetSprinting(true);
+    }
+}
+
+void ANYCharacterPlayer::StopSprint()
+{
+    if (HasAuthority())
+    {
+        if (PS_ref)
+            PS_ref->SetSprinting(false);
+    }
+    else
+    {
+        Server_SetSprinting(false);
+    }
+}
+
+void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
+{
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        PS->SetSprinting(bSprint);
+    }
+}
+
+void ANYCharacterPlayer::SwapWeaponSlots()
+{
+    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    {
+        return;
+    }
+
+    if (HasAuthority())
+    {
+        if (DefaultWeaponComp)
+        {
+            DefaultWeaponComp->SwapWeaponSlots();
+        }
+    }
+    else
+    {
+        Server_SwapWeaponSlots();
+    }
+}
+
+void ANYCharacterPlayer::Server_SwapWeaponSlots_Implementation()
+{
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        if (PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        {
+            return;
+        }
+    }
+
+    if (DefaultWeaponComp)
+    {
+        DefaultWeaponComp->SwapWeaponSlots();
+    }
+}
+
+
+// Stat
+float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+    if (!HasAuthority() || !PS_ref)
+        return 0.0f;
+
+    PS_ref->ApplyDamage(DamageAmount);
+
+    return DamageAmount;
+}
+
+void ANYCharacterPlayer::Die()
+{
+    // prevent falling down
+    GetCharacterMovement()->DisableMovement();
+
+    // Capule No Collision
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // Body remains?
+
+    // dead animation
+
+
+}
+
+void ANYCharacterPlayer::Revive()
+{
+    GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+    // stop dead animation?
+
 }
 
 void ANYCharacterPlayer::ResolveMonsterSoftCollision()
@@ -192,236 +426,8 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
     }
 }
 
-// after possessed, server only
-void ANYCharacterPlayer::PossessedBy(AController* NewController)
-{
-    Super::PossessedBy(NewController);
 
-    InitPlayerState();
-
-    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
-
-}
-
-// after possessed, client only 
-void ANYCharacterPlayer::PawnClientRestart()
-{
-    Super::PawnClientRestart();
-
-    InitPlayerState();
-
-    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
-    // add IMC into PlayerController
-    if (PC_ref)
-    {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC_ref->GetLocalPlayer()))
-        {
-            if (DefaultMappingContext)
-            {
-                Subsystem->AddMappingContext(DefaultMappingContext, 0);
-            }
-        }
-    }
-
-}
-
-void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-
-}
-
-void ANYCharacterPlayer::OnRep_PlayerState()
-{
-    Super::OnRep_PlayerState();
-
-    InitPlayerState();
-}
-
-void ANYCharacterPlayer::InitPlayerState()
-{
-    PS_ref = GetPlayerState<ANYPlayerStateStage>();
-
-    if (PS_ref)
-    {
-        PS_ref->ApplyMoveSpeedToPawn();
-    }
-}
-
-// bind trigger to specific function 
-// FInputActionValue : automatically processed when the player possess the pawn
-void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-
-
-    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
-    {
-        // Look
-        EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ANYCharacterPlayer::Look);
-
-        // Move
-        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ANYCharacterPlayer::Move);
-
-        // Sprint
-        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::Sprint);
-        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ANYCharacterPlayer::StopSprint);
-
-        // Jump
-        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-
-        // Weapon swap
-        EnhancedInputComponent->BindAction(WeaponSwapAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::SwapWeaponSlots);
-    }
-
-
-}
-
-void ANYCharacterPlayer::Look(const FInputActionValue& Value)
-{
-    FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-    if (PC_ref)
-    {
-        float Sensitivity = PC_ref->GetMouseSensitivity();
-
-        AddControllerYawInput(LookAxisVector.X * Sensitivity);
-        AddControllerPitchInput(LookAxisVector.Y * Sensitivity);
-    }
-}
-
-void ANYCharacterPlayer::Move(const FInputActionValue& Value)
-{
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
-        return;
-
-    FVector2D MovementVector = Value.Get<FVector2D>();
-
-    if (Controller != nullptr)
-    {
-        // Calculate front and right vectors based on the direction the controller (camera) looks at
-        const FRotator Rotation = Controller->GetControlRotation();
-        const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-        const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-        const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-        // Move according to input value
-        AddMovementInput(ForwardDirection, MovementVector.Y);
-        AddMovementInput(RightDirection, MovementVector.X);
-    }
-}
-
-void ANYCharacterPlayer::Sprint()
-{
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
-        return;
-
-    if (HasAuthority())
-    {
-        PS_ref->SetSprinting(true);
-    }
-    else
-    {
-        Server_SetSprinting(true);
-    }
-}
-
-void ANYCharacterPlayer::StopSprint()
-{
-    if (HasAuthority())
-    {
-        if (PS_ref)
-            PS_ref->SetSprinting(false);
-    }
-    else
-    {
-        Server_SetSprinting(false);
-    }
-}
-
-void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
-{
-    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
-    {
-        PS->SetSprinting(bSprint);
-    }
-}
-
-float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
-{
-    if (!HasAuthority() || !PS_ref)
-        return 0.0f;
-
-    PS_ref->ApplyDamage(DamageAmount);
-
-    return DamageAmount;
-}
-
-void ANYCharacterPlayer::Die()
-{
-    // prevent falling down
-    GetCharacterMovement()->DisableMovement();
-
-    // Capule No Collision
-    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    // Body remains?
-
-    // dead animation
-
-
-}
-
-void ANYCharacterPlayer::Revive()
-{
-    GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-
-    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
-    // stop dead animation?
-
-}
-
-void ANYCharacterPlayer::SwapWeaponSlots()
-{
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
-    {
-        return;
-    }
-
-    if (HasAuthority())
-    {
-        if (DefaultWeaponComp)
-        {
-            DefaultWeaponComp->SwapWeaponSlots();
-        }
-    }
-    else
-    {
-        Server_SwapWeaponSlots();
-    }
-}
-
-void ANYCharacterPlayer::Server_SwapWeaponSlots_Implementation()
-{
-    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
-    {
-        if (PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
-        {
-            return;
-        }
-    }
-
-    if (DefaultWeaponComp)
-    {
-        DefaultWeaponComp->SwapWeaponSlots();
-    }
-}
-
+// Weapon
 void ANYCharacterPlayer::ResetWeaponForNewRun()
 {
     if (DefaultWeaponComp)
@@ -429,4 +435,3 @@ void ANYCharacterPlayer::ResetWeaponForNewRun()
         DefaultWeaponComp->ResetWeaponLevel();
     }
 }
-

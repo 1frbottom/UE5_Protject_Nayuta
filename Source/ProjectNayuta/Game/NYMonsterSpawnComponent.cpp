@@ -41,6 +41,8 @@ void UNYMonsterSpawnComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+
+// Spawn
 void UNYMonsterSpawnComponent::StartSpawning()
 {
 	AActor* Owner = GetOwner();
@@ -64,14 +66,26 @@ void UNYMonsterSpawnComponent::StopSpawning()
 	}
 }
 
-void UNYMonsterSpawnComponent::UpdateSpawnerData(TSubclassOf<ANYMonsterBase> NewMonsterClass, float NewInterval)
+void UNYMonsterSpawnComponent::UpdateSpawnerData(
+	TSubclassOf<ANYMonsterBase> NewMonsterClass,
+	float NewInterval,
+	int32 NewSpawnCountPerTick,
+	float NewSpawnRadius)
 {
 	if (NewMonsterClass)
 	{
 		MonsterClass = NewMonsterClass;
 	}
 
-	SpawnInterval = NewInterval;
+	SpawnInterval = FMath::Max(NewInterval, KINDA_SMALL_NUMBER);
+	SpawnCountPerTick = FMath::Max(NewSpawnCountPerTick, 1);
+	SpawnRadius = FMath::Max(NewSpawnRadius, 0.0f);
+
+	if (SpawnTimerHandle.IsValid())
+	{
+		StopSpawning();
+		StartSpawning();
+	}
 }
 
 void UNYMonsterSpawnComponent::SpawnMonsterRoutine()

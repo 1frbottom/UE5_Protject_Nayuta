@@ -15,6 +15,7 @@ class PROJECTNAYUTA_API UNYWeaponDefinition : public UDataAsset
 {
 	GENERATED_BODY()
 
+// Weapon
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FText DisplayName;
@@ -34,4 +35,5 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	float Cooldown = 1.0f;
+
 };

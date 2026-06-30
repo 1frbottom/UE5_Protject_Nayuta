@@ -47,6 +47,8 @@ void UNYWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+
+// Weapon
 void UNYWeaponComponent::SetWeaponDefinition(UNYWeaponDefinition* NewDefinition)
 {
 	// Server
@@ -91,44 +93,49 @@ void UNYWeaponComponent::SwapWeaponSlots()
 	NotifyWeaponSlotsChanged();
 }
 
-int32 UNYWeaponComponent::GetMaxWeaponLevelForSlot(const FNYWeaponSlot& Slot) const
-{
-	if (!Slot.Definition || Slot.Definition->WeaponID.IsNone())
-	{
-		return 1;
-	}
-
-	const UWorld* World = GetWorld();
-	const ANYGameStateStage* GS = World ? World->GetGameState<ANYGameStateStage>() : nullptr;
-
-	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, Slot.Definition->WeaponID);
-}
-
 int32 UNYWeaponComponent::GetMaxWeaponLevel() const
 {
 	return GetMaxWeaponLevelForSlot(PrimarySlot);
 }
 
-bool UNYWeaponComponent::CanLevelUpWeapon() const
+bool UNYWeaponComponent::CanLevelUpSlot(bool bPrimary) const
 {
-	return PrimarySlot.Definition && PrimarySlot.Level < GetMaxWeaponLevel();
+	const FNYWeaponSlot& Slot = GetSlot(bPrimary);
+	
+	return Slot.Definition && Slot.Level < GetMaxWeaponLevelForSlot(Slot);
 }
 
-bool UNYWeaponComponent::LevelUpWeapon()
+bool UNYWeaponComponent::CanLevelUpWeapon() const
+{
+	return CanLevelUpSlot(true);
+}
+
+bool UNYWeaponComponent::LevelUpSlot(bool bPrimary)
 {
 	// Server
-	if (!GetOwner() || !GetOwner()->HasAuthority() || !CanLevelUpWeapon())
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CanLevelUpSlot(bPrimary))
 	{
 		return false;
 	}
 
-	PrimarySlot.Level++;
-	ApplyWeaponDefinition();
-	RefreshAttackTimer();
+	FNYWeaponSlot& Slot = bPrimary ? PrimarySlot : SecondarySlot;
+	Slot.Level++;
+
+	if (bPrimary)
+	{
+		ApplyWeaponDefinition();
+		RefreshAttackTimer();
+	}
+
 	NotifyWeaponLevelChanged();
 	NotifyWeaponSlotsChanged();
 
 	return true;
+}
+
+bool UNYWeaponComponent::LevelUpWeapon()
+{
+	return LevelUpSlot(true);
 }
 
 void UNYWeaponComponent::ResetWeaponLevel()
@@ -154,24 +161,6 @@ void UNYWeaponComponent::ResetWeaponLevel()
 	RefreshAttackTimer();
 	NotifyWeaponLevelChanged();
 	NotifyWeaponSlotsChanged();
-}
-
-void UNYWeaponComponent::OnRep_WeaponSlots()
-{
-	ApplyWeaponDefinition();
-	RefreshAttackTimer();
-	NotifyWeaponLevelChanged();
-	NotifyWeaponSlotsChanged();
-}
-
-void UNYWeaponComponent::NotifyWeaponLevelChanged()
-{
-	OnWeaponLevelChanged.Broadcast(PrimarySlot.Level);
-}
-
-void UNYWeaponComponent::NotifyWeaponSlotsChanged()
-{
-	OnWeaponSlotsChanged.Broadcast();
 }
 
 void UNYWeaponComponent::ApplyWeaponDefinition()
@@ -220,6 +209,42 @@ void UNYWeaponComponent::RefreshAttackTimer()
 
 	GetWorld()->GetTimerManager().SetTimer(
 		AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
+}
+
+void UNYWeaponComponent::NotifyWeaponLevelChanged()
+{
+	OnWeaponLevelChanged.Broadcast(PrimarySlot.Level);
+}
+
+void UNYWeaponComponent::NotifyWeaponSlotsChanged()
+{
+	OnWeaponSlotsChanged.Broadcast();
+}
+
+int32 UNYWeaponComponent::GetMaxWeaponLevelForSlot(const FNYWeaponSlot& Slot) const
+{
+	if (!Slot.Definition || Slot.Definition->WeaponID.IsNone())
+	{
+		return 1;
+	}
+
+	const UWorld* World = GetWorld();
+	const ANYGameStateStage* GS = World ? World->GetGameState<ANYGameStateStage>() : nullptr;
+
+	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, Slot.Definition->WeaponID);
+}
+
+const FNYWeaponSlot& UNYWeaponComponent::GetSlot(bool bPrimary) const
+{
+	return bPrimary ? PrimarySlot : SecondarySlot;
+}
+
+void UNYWeaponComponent::OnRep_WeaponSlots()
+{
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
 }
 
 void UNYWeaponComponent::FireAttack()
@@ -294,4 +319,3 @@ void UNYWeaponComponent::FireAttack()
 		}
 	}
 }
-

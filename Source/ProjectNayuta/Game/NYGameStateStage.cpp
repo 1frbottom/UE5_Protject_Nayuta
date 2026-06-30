@@ -20,6 +20,18 @@ void ANYGameStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 }
 
+
+// Phase
+void ANYGameStateStage::SetGamePhase(ENYGamePhase NewPhase)
+{
+	if (HasAuthority())
+	{
+		CurrPhase = NewPhase;
+
+		OnRep_CurrPhase();
+	}
+}
+
 void ANYGameStateStage::OnRep_CurrPhase()
 {
 	if (!GetWorld())
@@ -44,15 +56,3 @@ void ANYGameStateStage::OnRep_CurrPhase()
 
 
 }
-
-void ANYGameStateStage::SetGamePhase(ENYGamePhase NewPhase)
-{
-	if (HasAuthority())
-	{
-		CurrPhase = NewPhase;
-
-		OnRep_CurrPhase();
-	}
-}
-
-

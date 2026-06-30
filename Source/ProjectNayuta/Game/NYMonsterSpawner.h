@@ -21,6 +21,10 @@ class PROJECTNAYUTA_API ANYMonsterSpawner : public AActor
 public:
 	ANYMonsterSpawner();
 
+
+// Spawn
+public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawn")
 	TObjectPtr<UNYMonsterSpawnComponent> SpawnComponent;
+
 };

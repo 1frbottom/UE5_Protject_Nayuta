@@ -5,10 +5,15 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 
+#include "Game/NYRewardTypes.h"
+
 #include "NYStageDataRows.generated.h"
 
 
 
+class UNYWeaponDefinition;
+
+// Level
 /** Row name = player level (e.g. "1", "2"). RequiredExp = EXP to reach the next level. */
 USTRUCT(BlueprintType)
 struct FNYPlayerLevelRow : public FTableRowBase
@@ -19,6 +24,7 @@ struct FNYPlayerLevelRow : public FTableRowBase
 	int32 RequiredExp = 100;
 };
 
+// Wave
 /** Row name = wave index (e.g. "1", "2"). MonsterType resolves via UNYStageContentRegistry. */
 USTRUCT(BlueprintType)
 struct FNYWaveDataRow : public FTableRowBase
@@ -31,10 +37,17 @@ struct FNYWaveDataRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wave")
 	float SpawnInterval = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wave", meta = (ClampMin = "1"))
+	int32 SpawnCountPerTick = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wave", meta = (ClampMin = "0"))
+	float SpawnRadius = 500.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wave")
 	FName MonsterType = TEXT("Melee");
 };
 
+// MonsterReward
 /** Row name = monster reward id (e.g. "Default", "Melee"). Referenced by ANYMonsterBase::RewardRowID. */
 USTRUCT(BlueprintType)
 struct FNYMonsterRewardRow : public FTableRowBase
@@ -48,6 +61,7 @@ struct FNYMonsterRewardRow : public FTableRowBase
 	int32 GoldReward = 5;
 };
 
+// WeaponLevel
 /** Row name = "{WeaponID}_{Level}" (e.g. "Sword_1"). Lookup by WeaponID + Level columns. */
 USTRUCT(BlueprintType)
 struct FNYWeaponLevelRow : public FTableRowBase
@@ -69,4 +83,30 @@ struct FNYWeaponLevelRow : public FTableRowBase
 	/** Applied to Cooldown — lower values mean faster attacks. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	float CooldownMultiplier = 1.0f;
+};
+
+// RewardPool
+/** Weighted wave reward pool. WeaponUpgrade rows expand into one candidate per eligible slot. */
+USTRUCT(BlueprintType)
+struct FNYRewardPoolRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
+	ENYRewardType RewardType = ENYRewardType::StatMaxHp;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
+	float Value = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
+	TObjectPtr<UNYWeaponDefinition> WeaponDefinition = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
+	float Weight = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reward")
+	int32 MinWave = 1;
 };

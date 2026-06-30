@@ -24,27 +24,34 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+
+// Spawn
 public:
 	void StartSpawning();
 	void StopSpawning();
 
-	void UpdateSpawnerData(TSubclassOf<ANYMonsterBase> NewMonsterClass, float NewInterval);
+	void UpdateSpawnerData(
+		TSubclassOf<ANYMonsterBase> NewMonsterClass,
+		float NewInterval,
+		int32 NewSpawnCountPerTick,
+		float NewSpawnRadius);
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Spawn")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawn")
 	TSubclassOf<ANYMonsterBase> MonsterClass;
 
-	UPROPERTY(EditAnywhere, Category = "Spawn")
-	float SpawnInterval = 5.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawn")
+	float SpawnInterval = 1.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Spawn")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawn")
 	float SpawnRadius = 500.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Spawn")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawn")
 	int32 SpawnCountPerTick = 10;
 
 private:
 	FTimerHandle SpawnTimerHandle;
 
 	void SpawnMonsterRoutine();
+
 };

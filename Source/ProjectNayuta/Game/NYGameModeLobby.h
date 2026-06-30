@@ -4,21 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "Game/NYGameModeBase.h"
-#include "NYGameModeMainmenu.generated.h"
+#include "NYGameModeLobby.generated.h"
 
 /**
- * 
+ * Listen-server lobby map. Uses seamless travel for Lobby -> Stage while connected clients stay attached.
  */
 UCLASS()
-class PROJECTNAYUTA_API ANYGameModeMainmenu : public ANYGameModeBase
+class PROJECTNAYUTA_API ANYGameModeLobby : public ANYGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	ANYGameModeMainmenu();
+	ANYGameModeLobby();
 
 protected:
 	virtual void InitGameState() override;
-
-
 };

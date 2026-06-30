@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Player/NYPlayerControllerBase.h"
+#include "Game/NYRewardTypes.h"
 #include "NYPlayerControllerStage.generated.h"
 
 
@@ -19,20 +20,19 @@ UCLASS()
 class PROJECTNAYUTA_API ANYPlayerControllerStage : public ANYPlayerControllerBase
 {
 	GENERATED_BODY()
-	
+
 protected:
     virtual void BeginPlay() override;
+    virtual void SetupInputComponent() override;
+
 
 // UI
-
-    // Phase
 public:
+    // Phase
     UFUNCTION(BlueprintCallable, Category = "UI")
     void HandleGamePhaseChanged(ENYGamePhase NewPhase);
 
     // Hp
-public:
-       // Event to call when the character's health changes, BP_PlayerController calls HUD to update
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdatePlayerHpUI(float HpPercentage);
 
@@ -46,18 +46,13 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdateGoldUI(int32 GoldAmount);
 
-
     // Pause
-public:
     virtual void TogglePause() override;
 
-        // Event to call when the pause menu is toggled, BP_PlayerController calls HUD to update
-    UFUNCTION(BlueprintImplementableEvent, Category = "UI") 
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void OnTogglePauseMenu();
 
 protected:
-    virtual void SetupInputComponent() override;
-
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     TObjectPtr<UInputMappingContext> IMC_InGame;
 
@@ -68,7 +63,10 @@ protected:
 // Reward
 public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
-    void ShowRewardUI();
+    void ShowRewardUI(const TArray<FNYRewardOffer>& Offers);
+
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void ConfirmRewardSelection(int32 SlotIndex);
 
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Server")
     void Server_SelectReward(int32 RewardID);
@@ -82,10 +80,10 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void ShowAliveUI();
 
+
 // GameOver
 public:
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
-
     void ShowGameOverUI();
 
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Server")

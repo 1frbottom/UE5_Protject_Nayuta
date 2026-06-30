@@ -35,6 +35,13 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+
+// Weapon
+public:
 	/** Server: set the primary weapon definition and reset its level to 1. */
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void SetWeaponDefinition(UNYWeaponDefinition* NewDefinition);
@@ -62,7 +69,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	bool CanLevelUpWeapon() const;
 
-	/** Server: increase primary weapon level and refresh combat stats. Returns false at max level. */
+	/** Server: increase weapon level for the given slot. Returns false at max level or empty slot. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	bool LevelUpSlot(bool bPrimary);
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	bool CanLevelUpSlot(bool bPrimary) const;
+
+	/** Server: increase primary weapon level. Returns false at max level. */
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	bool LevelUpWeapon();
 
@@ -78,20 +92,17 @@ public:
 	FNYOnWeaponSlotsChanged OnWeaponSlotsChanged;
 
 protected:
-	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
 	void ApplyWeaponDefinition();
 	void RefreshAttackTimer();
 	void NotifyWeaponLevelChanged();
 	void NotifyWeaponSlotsChanged();
 
 	int32 GetMaxWeaponLevelForSlot(const FNYWeaponSlot& Slot) const;
+	const FNYWeaponSlot& GetSlot(bool bPrimary) const;
 
 	UFUNCTION()
 	void OnRep_WeaponSlots();
 
-protected:
 	UPROPERTY(EditDefaultsOnly, ReplicatedUsing = OnRep_WeaponSlots, Category = "Weapon")
 	FNYWeaponSlot PrimarySlot;
 
@@ -106,5 +117,5 @@ protected:
 	FTimerHandle AttackTimer;
 
 	void FireAttack();
-};
 
+};

@@ -12,9 +12,12 @@
 #include "Game/NYMonsterSpawnComponent.h"
 #include "Game/NYMonsterPoolComponent.h"
 #include "Game/NYStageContentRegistry.h"
+#include "Game/NYRewardTypes.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
-#include "Game/NYGameStateStage.h"
+#include "Characters/CharacterPlayers/NYCharacterPlayer.h"
+#include "Weapons/NYWeaponComponent.h"
+#include "Weapons/NYWeaponDefinition.h"
 #include "Weapons/NYWeaponLevelLibrary.h"
 
 
@@ -58,62 +61,6 @@ void ANYGameModeStage::HandleStartingNewPlayer_Implementation(APlayerController*
 	}
 }
 
-int32 ANYGameModeStage::CountPlayersWithPawn() const
-{
-	int32 Count = 0;
-
-	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
-		for (APlayerState* PS : GS->PlayerArray)
-		{
-			if (PS && PS->GetPawn())
-				Count++;
-		}
-
-	return Count;
-}
-
-int32 ANYGameModeStage::CountPlayersInPhase(ENYPlayerPhase Phase) const
-{
-	int32 Count = 0;
-
-	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
-	{
-		for (APlayerState* PS : GS->PlayerArray)
-		{
-			if (const ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS))
-			{
-				if (StagePS->GetPlayerPhase() == Phase)
-				{
-					Count++;
-				}
-			}
-		}
-	}
-
-	return Count;
-}
-
-void ANYGameModeStage::TryStartFirstWave()
-{
-	if (CurrWave > 0)
-	{
-		return;
-	}
-
-	const int32 NumPlayers = GetNumPlayers();
-	if (NumPlayers <= 0)
-	{
-		return;
-	}
-
-	if (CountPlayersWithPawn() < NumPlayers)
-	{
-		return;
-	}
-
-	StartNextWave();
-}
-
 void ANYGameModeStage::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
@@ -133,10 +80,7 @@ void ANYGameModeStage::Logout(AController* Exiting)
 	// Avoid reward-phase softlock when someone leaves during rewarding.
 	if (GS->GetGamePhase() == ENYGamePhase::Rewarding)
 	{
-		if (RewardedPlayerCnt >= GetNumPlayers())
-		{
-			StartNextWave();
-		}
+		TryAdvanceWaveAfterRewards();
 	}
 
 	// Avoid game-over retry softlock when someone leaves after voting.
@@ -147,6 +91,58 @@ void ANYGameModeStage::Logout(AController* Exiting)
 			GetWorld()->ServerTravel("?Restart", false);
 		}
 	}
+}
+
+
+// Wave
+int32 ANYGameModeStage::GetRequiredExpForLevel(int32 InLevel) const
+{
+	if (!PlayerLevelDataTable || InLevel <= 0)
+	{
+		return 0;
+	}
+
+	const FName RowName = FName(*FString::FromInt(InLevel));
+	const FNYPlayerLevelRow* Row = PlayerLevelDataTable->FindRow<FNYPlayerLevelRow>(RowName, TEXT("PlayerLevel"));
+	if (!Row || Row->RequiredExp <= 0)
+	{
+		return 0;
+	}
+
+	return Row->RequiredExp;
+}
+
+bool ANYGameModeStage::TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const
+{
+	OutExp = 0;
+	OutGold = 0;
+
+	if (!MonsterRewardDataTable || RewardRowID.IsNone())
+	{
+		return false;
+	}
+
+	const FNYMonsterRewardRow* Row = MonsterRewardDataTable->FindRow<FNYMonsterRewardRow>(RewardRowID, TEXT("MonsterReward"));
+	if (!Row)
+	{
+		return false;
+	}
+
+	OutExp = FMath::Max(0, Row->ExpReward);
+	OutGold = FMath::Max(0, Row->GoldReward);
+	return OutExp > 0 || OutGold > 0;
+}
+
+int32 ANYGameModeStage::GetMaxWeaponLevel(FName WeaponID) const
+{
+	const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
+	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID);
+}
+
+bool ANYGameModeStage::TryGetWeaponLevelRow(FName WeaponID, int32 Level, FNYWeaponLevelRow& OutRow) const
+{
+	const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
+	return NYWeaponLevel::TryGetRow(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID, Level, OutRow);
 }
 
 void ANYGameModeStage::OnEnemyKilled(AController* KillerController, ANYMonsterBase* KilledMonster)
@@ -174,135 +170,13 @@ void ANYGameModeStage::OnEnemyKilled(AController* KillerController, ANYMonsterBa
 	}
 }
 
-int32 ANYGameModeStage::GetRequiredExpForLevel(int32 InLevel) const
+void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 {
-	if (!PlayerLevelDataTable || InLevel <= 0)
+	(void)PC_victim;
+
+	if (CountPlayersInPhase(ENYPlayerPhase::Alive) <= 0)
 	{
-		return 0;
-	}
-
-	const FName RowName = FName(*FString::FromInt(InLevel));
-	const FNYPlayerLevelRow* Row = PlayerLevelDataTable->FindRow<FNYPlayerLevelRow>(RowName, TEXT("PlayerLevel"));
-	if (!Row || Row->RequiredExp <= 0)
-	{
-		return 0;
-	}
-
-	return Row->RequiredExp;
-}
-
-int32 ANYGameModeStage::GetMaxWeaponLevel(FName WeaponID) const
-{
-	const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
-	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID);
-}
-
-bool ANYGameModeStage::TryGetWeaponLevelRow(FName WeaponID, int32 Level, FNYWeaponLevelRow& OutRow) const
-{
-	const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
-	return NYWeaponLevel::TryGetRow(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID, Level, OutRow);
-}
-
-TSubclassOf<ANYMonsterBase> ANYGameModeStage::ResolveMonsterClass(FName MonsterType) const
-{
-	if (StageContentRegistry)
-	{
-		return StageContentRegistry->ResolveMonsterClass(MonsterType);
-	}
-
-	return nullptr;
-}
-
-void ANYGameModeStage::EnsureMonsterPoolForClass(TSubclassOf<ANYMonsterBase> MonsterClass)
-{
-	if (!MonsterPoolComponent || !MonsterClass || CachedPoolMonsterClass == MonsterClass)
-	{
-		return;
-	}
-
-	MonsterPoolComponent->InitializePool(MonsterClass, InitialPoolSize);
-	CachedPoolMonsterClass = MonsterClass;
-}
-
-void ANYGameModeStage::ApplyWaveDataToSpawners(const FNYWaveDataRow& WaveData)
-{
-	const TSubclassOf<ANYMonsterBase> MonsterClass = ResolveMonsterClass(WaveData.MonsterType);
-	if (!MonsterClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[ANYGameModeStage] Unknown MonsterType: %s"), *WaveData.MonsterType.ToString());
-		return;
-	}
-
-	EnsureMonsterPoolForClass(MonsterClass);
-
-	for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
-	{
-		if (SpawnComponent)
-		{
-			SpawnComponent->UpdateSpawnerData(MonsterClass, WaveData.SpawnInterval);
-		}
-	}
-}
-
-bool ANYGameModeStage::TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const
-{
-	OutExp = 0;
-	OutGold = 0;
-
-	if (!MonsterRewardDataTable || RewardRowID.IsNone())
-	{
-		return false;
-	}
-
-	const FNYMonsterRewardRow* Row = MonsterRewardDataTable->FindRow<FNYMonsterRewardRow>(RewardRowID, TEXT("MonsterReward"));
-	if (!Row)
-	{
-		return false;
-	}
-
-	OutExp = FMath::Max(0, Row->ExpReward);
-	OutGold = FMath::Max(0, Row->GoldReward);
-	return OutExp > 0 || OutGold > 0;
-}
-
-void ANYGameModeStage::GrantKillRewards(AController* KillerController, int32 ExpAmount, int32 GoldAmount)
-{
-	if (ExpAmount <= 0 && GoldAmount <= 0)
-	{
-		return;
-	}
-
-	auto GrantToPlayerState = [&](ANYPlayerStateStage* StagePS)
-	{
-		if (!StagePS || StagePS->GetPlayerPhase() != ENYPlayerPhase::Alive)
-		{
-			return;
-		}
-
-		if (ExpAmount > 0)
-		{
-			StagePS->AddExp(ExpAmount);
-		}
-
-		if (GoldAmount > 0)
-		{
-			StagePS->AddGold(GoldAmount);
-		}
-	};
-
-	if (ANYPlayerStateStage* KillerPS = KillerController ? KillerController->GetPlayerState<ANYPlayerStateStage>() : nullptr)
-	{
-		GrantToPlayerState(KillerPS);
-		return;
-	}
-
-	// No valid killer: share rewards with every alive player (co-op fallback).
-	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
-	{
-		for (APlayerState* PS : GS->PlayerArray)
-		{
-			GrantToPlayerState(Cast<ANYPlayerStateStage>(PS));
-		}
+		GameOver();
 	}
 }
 
@@ -362,7 +236,6 @@ void ANYGameModeStage::StartNextWave()
 				if (MyPS->GetPawn() != nullptr)
 				{
 					MyPS->SetPlayerPhase(ENYPlayerPhase::Alive);
-					MyPS->SetCurrHp(MyPS->GetMaxHp());
 				}
 			}
 		}
@@ -373,14 +246,25 @@ void ANYGameModeStage::StartNextWave()
 
 }
 
-void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
+void ANYGameModeStage::TryStartFirstWave()
 {
-	(void)PC_victim;
-
-	if (CountPlayersInPhase(ENYPlayerPhase::Alive) <= 0)
+	if (CurrWave > 0)
 	{
-		GameOver();
+		return;
 	}
+
+	const int32 NumPlayers = GetNumPlayers();
+	if (NumPlayers <= 0)
+	{
+		return;
+	}
+
+	if (CountPlayersWithPawn() < NumPlayers)
+	{
+		return;
+	}
+
+	StartNextWave();
 }
 
 void ANYGameModeStage::GameOver()
@@ -393,6 +277,61 @@ void ANYGameModeStage::GameOver()
 	SetSpawnersActive(false);
 
 
+}
+
+int32 ANYGameModeStage::CountPlayersWithPawn() const
+{
+	int32 Count = 0;
+
+	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			if (PS && PS->GetPawn())
+				Count++;
+		}
+
+	return Count;
+}
+
+int32 ANYGameModeStage::CountPlayersInPhase(ENYPlayerPhase Phase) const
+{
+	int32 Count = 0;
+
+	if (const ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			if (const ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS))
+			{
+				if (StagePS->GetPlayerPhase() == Phase)
+				{
+					Count++;
+				}
+			}
+		}
+	}
+
+	return Count;
+}
+
+
+// Reward
+void ANYGameModeStage::OnPlayerRewarded()
+{
+	TryAdvanceWaveAfterRewards();
+}
+
+void ANYGameModeStage::TryAdvanceWaveAfterRewards()
+{
+	if (GetNumPlayers() <= 0)
+	{
+		return;
+	}
+
+	if (CountPlayersInPhase(ENYPlayerPhase::Ready) >= GetNumPlayers())
+	{
+		StartNextWave();
+	}
 }
 
 void ANYGameModeStage::StartRewardPhase()
@@ -412,44 +351,359 @@ void ANYGameModeStage::StartRewardPhase()
 				Monster->Destroy();
 		}
 
-	// GameState
 	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
-	if (GS)
+	if (!GS)
 	{
-		GS->SetGamePhase(ENYGamePhase::Rewarding);
+		return;
+	}
 
-		// PlayerStates
-		for (APlayerState* PS : GS->PlayerArray)
+	GS->SetGamePhase(ENYGamePhase::Rewarding);
+
+	RewardedPlayerCnt = 0;
+
+	for (APlayerState* PS : GS->PlayerArray)
+	{
+		ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS);
+		if (!StagePS)
 		{
-			ANYPlayerStateStage* MyPS = Cast<ANYPlayerStateStage>(PS);
-			if (MyPS)
+			continue;
+		}
+
+		// Died before the wave ended — skip reward UI and count as ready.
+		if (StagePS->GetPlayerPhase() == ENYPlayerPhase::Dead)
+		{
+			StagePS->SetPendingRewardOffers(TArray<FNYRewardOffer>());
+			StagePS->SetPlayerPhase(ENYPlayerPhase::Ready);
+			continue;
+		}
+
+		const TArray<FNYRewardOffer> Offers = GenerateRewardOffers(StagePS);
+		if (Offers.Num() <= 0)
+		{
+			StagePS->SetPendingRewardOffers(TArray<FNYRewardOffer>());
+			StagePS->SetPlayerPhase(ENYPlayerPhase::Ready);
+			continue;
+		}
+
+		StagePS->SetPendingRewardOffers(Offers);
+		StagePS->SetPlayerPhase(ENYPlayerPhase::Rewarding);
+	}
+
+	TryAdvanceWaveAfterRewards();
+
+	// TODO: Reward selection timeout timer.
+}
+
+namespace NYRewardGeneration
+{
+	// before FNYRewardOffer ( no slotIndex )
+	struct FCandidate
+	{
+		ENYRewardType RewardType = ENYRewardType::StatMaxHp;
+		float StatValue = 0.0f;
+		TObjectPtr<UNYWeaponDefinition> WeaponDefinition = nullptr;
+		ENYRewardWeaponSlot WeaponSlot = ENYRewardWeaponSlot::None;
+		float Weight = 1.0f;
+		FText DisplayName;
+	};
+
+	bool PlayerOwnsWeapon(const UNYWeaponComponent* WeaponComp, const UNYWeaponDefinition* WeaponDef)
+	{
+		if (!WeaponComp || !WeaponDef)
+		{
+			return false;
+		}
+
+		const FNYWeaponSlot& Primary = WeaponComp->GetPrimarySlot();
+		const FNYWeaponSlot& Secondary = WeaponComp->GetSecondarySlot();
+
+		return Primary.Definition == WeaponDef || Secondary.Definition == WeaponDef;
+	}
+
+	bool CanOfferNewWeapon(const UNYWeaponComponent* WeaponComp, const UNYWeaponDefinition* WeaponDef)
+	{
+		if (!WeaponComp || !WeaponDef)
+		{
+			return false;
+		}
+
+		if (WeaponComp->GetSecondarySlot().Definition)
+		{
+			return false;
+		}
+
+		return !PlayerOwnsWeapon(WeaponComp, WeaponDef);
+	}
+
+	FText BuildUpgradeDescription(
+		const ANYGameModeStage* GameMode,
+		const UNYWeaponDefinition* WeaponDef,
+		int32 CurrentLevel)
+	{
+		if (!WeaponDef)
+		{
+			return FText::GetEmpty();
+		}
+
+		const int32 NextLevel = CurrentLevel + 1;
+		FNYWeaponLevelRow NextRow;
+
+		if (GameMode && GameMode->TryGetWeaponLevelRow(WeaponDef->WeaponID, NextLevel, NextRow))
+		{
+			return FText::Format(
+				NSLOCTEXT("NYReward", "WeaponUpgradeDesc", "Lv{0} → Lv{1} (DMG x{2})"),
+				FText::AsNumber(CurrentLevel),
+				FText::AsNumber(NextLevel),
+				FText::AsNumber(NextRow.DamageMultiplier));
+		}
+
+		return FText::Format(
+			NSLOCTEXT("NYReward", "WeaponUpgradeDescSimple", "Lv{0} → Lv{1}"),
+			FText::AsNumber(CurrentLevel),
+			FText::AsNumber(NextLevel));
+	}
+
+	FText ResolveDisplayName(const FNYRewardPoolRow& Row)
+	{
+		if (!Row.DisplayName.IsEmpty())
+		{
+			return Row.DisplayName;
+		}
+
+		switch (Row.RewardType)
+		{
+		case ENYRewardType::StatMaxHp:
+			return NSLOCTEXT("NYReward", "StatMaxHp", "Max HP Up");
+		case ENYRewardType::StatMoveSpeed:
+			return NSLOCTEXT("NYReward", "StatMoveSpeed", "Move Speed Up");
+		case ENYRewardType::NewWeapon:
+			return Row.WeaponDefinition ? Row.WeaponDefinition->DisplayName : NSLOCTEXT("NYReward", "NewWeapon", "New Weapon");
+		case ENYRewardType::WeaponUpgrade:
+			return NSLOCTEXT("NYReward", "WeaponUpgrade", "Weapon Upgrade");
+		default:
+			return FText::GetEmpty();
+		}
+	}
+
+	int32 PickWeightedIndex(const TArray<FCandidate>& Candidates, const TArray<bool>& bUsed)
+	{
+		float TotalWeight = 0.0f;
+		for (int32 Index = 0; Index < Candidates.Num(); ++Index)
+		{
+			if (!bUsed[Index])
 			{
-				MyPS->SetPlayerPhase(ENYPlayerPhase::Rewarding);
+				TotalWeight += FMath::Max(0.0f, Candidates[Index].Weight);
+			}
+		}
+
+		if (TotalWeight <= 0.0f)
+		{
+			return INDEX_NONE;
+		}
+
+		float Roll = FMath::FRandRange(0.0f, TotalWeight);
+		float Accumulated = 0.0f;
+
+		for (int32 Index = 0; Index < Candidates.Num(); ++Index)
+		{
+			if (bUsed[Index])
+			{
+				continue;
+			}
+
+			Accumulated += FMath::Max(0.0f, Candidates[Index].Weight);
+			if (Roll <= Accumulated)
+			{
+				return Index;
+			}
+		}
+
+		// fallback
+		for (int32 Index = Candidates.Num() - 1; Index >= 0; --Index)
+		{
+			if (!bUsed[Index])
+			{
+				return Index;
+			}
+		}
+
+		return INDEX_NONE;
+	}
+}
+
+TArray<FNYRewardOffer> ANYGameModeStage::GenerateRewardOffers(ANYPlayerStateStage* PlayerState) const
+{
+	TArray<FNYRewardOffer> Offers;
+
+	if (!PlayerState || RewardOfferCount <= 0)
+	{
+		return Offers;
+	}
+
+	ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(PlayerState->GetPawn());
+	UNYWeaponComponent* WeaponComp = Character ? Character->GetWeaponComponent() : nullptr;
+
+	TArray<NYRewardGeneration::FCandidate> Candidates;
+
+	if (RewardPoolDataTable)
+	{
+		for (const TPair<FName, uint8*>& Pair : RewardPoolDataTable->GetRowMap())
+		{
+			const FNYRewardPoolRow* Row = reinterpret_cast<const FNYRewardPoolRow*>(Pair.Value);
+			if (!Row || Row->MinWave > CurrWave || Row->Weight <= 0.0f)
+			{
+				continue;
+			}
+
+			switch (Row->RewardType)
+			{
+			case ENYRewardType::StatMaxHp:
+			case ENYRewardType::StatMoveSpeed:
+			{
+				NYRewardGeneration::FCandidate Candidate;
+				Candidate.RewardType = Row->RewardType;
+				Candidate.StatValue = Row->Value;
+				Candidate.Weight = Row->Weight;
+				Candidate.DisplayName = NYRewardGeneration::ResolveDisplayName(*Row);
+				Candidates.Add(Candidate);
+				break;
+			}
+
+			case ENYRewardType::NewWeapon:
+			{
+				if (NYRewardGeneration::CanOfferNewWeapon(WeaponComp, Row->WeaponDefinition))
+				{
+					NYRewardGeneration::FCandidate Candidate;
+					Candidate.RewardType = ENYRewardType::NewWeapon;
+					Candidate.WeaponDefinition = Row->WeaponDefinition;
+					Candidate.Weight = Row->Weight;
+					Candidate.DisplayName = NYRewardGeneration::ResolveDisplayName(*Row);
+					Candidates.Add(Candidate);
+				}
+				break;
+			}
+
+			case ENYRewardType::WeaponUpgrade:
+			{
+				if (WeaponComp)
+				{
+					if (WeaponComp->CanLevelUpSlot(true))
+					{
+						const FNYWeaponSlot& Primary = WeaponComp->GetPrimarySlot();
+						NYRewardGeneration::FCandidate Candidate;
+						Candidate.RewardType = ENYRewardType::WeaponUpgrade;
+						Candidate.WeaponDefinition = Primary.Definition;
+						Candidate.WeaponSlot = ENYRewardWeaponSlot::Primary;
+						Candidate.Weight = Row->Weight;
+						Candidate.DisplayName = Primary.Definition
+							? Primary.Definition->DisplayName
+							: NYRewardGeneration::ResolveDisplayName(*Row);
+						Candidates.Add(Candidate);
+					}
+
+					if (WeaponComp->CanLevelUpSlot(false))
+					{
+						const FNYWeaponSlot& Secondary = WeaponComp->GetSecondarySlot();
+						NYRewardGeneration::FCandidate Candidate;
+						Candidate.RewardType = ENYRewardType::WeaponUpgrade;
+						Candidate.WeaponDefinition = Secondary.Definition;
+						Candidate.WeaponSlot = ENYRewardWeaponSlot::Secondary;
+						Candidate.Weight = Row->Weight;
+						Candidate.DisplayName = Secondary.Definition
+							? Secondary.Definition->DisplayName
+							: NYRewardGeneration::ResolveDisplayName(*Row);
+						Candidates.Add(Candidate);
+					}
+				}
+				break;
+			}
+
+			default:
+				break;
 			}
 		}
 	}
 
-
-	RewardedPlayerCnt = 0;
-
-	// TODO: Reward selection timeout timer.
-
-
-}
-
-void ANYGameModeStage::OnPlayerRewarded()
-{
-	// TODO: Apply the player's reward choice.
-
-	RewardedPlayerCnt++;
-	if (RewardedPlayerCnt >= GetNumPlayers())
+	if (Candidates.Num() <= 0)
 	{
-		StartNextWave();
+		return Offers;
 	}
 
-	GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("reward clicked! current : %d / needed : %d"), RewardedPlayerCnt, GetNumPlayers()));
+	TArray<bool> bUsed;
+	bUsed.Init(false, Candidates.Num());
+
+	const int32 OfferCount = FMath::Min(RewardOfferCount, Candidates.Num());
+	Offers.Reserve(OfferCount);
+
+	for (int32 SlotIndex = 0; SlotIndex < OfferCount; ++SlotIndex)
+	{
+		const int32 PickedIndex = NYRewardGeneration::PickWeightedIndex(Candidates, bUsed);
+		if (PickedIndex == INDEX_NONE)
+		{
+			break;
+		}
+
+		bUsed[PickedIndex] = true;
+		const NYRewardGeneration::FCandidate& Candidate = Candidates[PickedIndex];
+
+		FNYRewardOffer Offer;
+		Offer.SlotIndex = SlotIndex;
+		Offer.RewardType = Candidate.RewardType;
+		Offer.StatValue = Candidate.StatValue;
+		Offer.WeaponDefinition = Candidate.WeaponDefinition;
+		Offer.WeaponSlot = Candidate.WeaponSlot;
+		Offer.DisplayName = Candidate.DisplayName;
+
+		switch (Candidate.RewardType)
+		{
+		case ENYRewardType::StatMaxHp:
+			Offer.Description = FText::Format(
+				NSLOCTEXT("NYReward", "OfferStatMaxHp", "+{0} Max HP"),
+				FText::AsNumber(Candidate.StatValue));
+			break;
+
+		case ENYRewardType::StatMoveSpeed:
+			Offer.Description = FText::Format(
+				NSLOCTEXT("NYReward", "OfferStatMoveSpeed", "+{0} Move Speed"),
+				FText::AsNumber(Candidate.StatValue));
+			break;
+
+		case ENYRewardType::NewWeapon:
+			if (Candidate.WeaponDefinition)
+			{
+				Offer.DisplayName = Candidate.WeaponDefinition->DisplayName;
+			}
+			Offer.Description = NSLOCTEXT("NYReward", "NewWeaponTag", "New");
+			break;
+
+		case ENYRewardType::WeaponUpgrade:
+		{
+			int32 CurrentLevel = 1;
+			if (WeaponComp)
+			{
+				const FNYWeaponSlot& Slot = Candidate.WeaponSlot == ENYRewardWeaponSlot::Primary
+					? WeaponComp->GetPrimarySlot()
+					: WeaponComp->GetSecondarySlot();
+				CurrentLevel = Slot.Level;
+			}
+
+			Offer.Description = NYRewardGeneration::BuildUpgradeDescription(
+				this, Candidate.WeaponDefinition, CurrentLevel);
+			break;
+		}
+
+		default:
+			break;
+		}
+
+		Offers.Add(Offer);
+	}
+
+	return Offers;
 }
 
+
+// Retry
 void ANYGameModeStage::AddRetryVote()
 {
 	RetryVoteCount++;
@@ -469,6 +723,8 @@ void ANYGameModeStage::AddRetryVote()
 
 }
 
+
+// Spawner
 void ANYGameModeStage::RegisterSpawnComponent(UNYMonsterSpawnComponent* SpawnComponent)
 {
 	if (!SpawnComponent || ActiveSpawnComponents.Contains(SpawnComponent))
@@ -502,4 +758,90 @@ void ANYGameModeStage::SetSpawnersActive(bool bActive)
 				SpawnComponent->StartSpawning();
 			else
 				SpawnComponent->StopSpawning();
+}
+
+TSubclassOf<ANYMonsterBase> ANYGameModeStage::ResolveMonsterClass(FName MonsterType) const
+{
+	if (StageContentRegistry)
+	{
+		return StageContentRegistry->ResolveMonsterClass(MonsterType);
+	}
+
+	return nullptr;
+}
+
+void ANYGameModeStage::EnsureMonsterPoolForClass(TSubclassOf<ANYMonsterBase> MonsterClass)
+{
+	if (!MonsterPoolComponent || !MonsterClass || CachedPoolMonsterClass == MonsterClass)
+	{
+		return;
+	}
+
+	MonsterPoolComponent->InitializePool(MonsterClass, InitialPoolSize);
+	CachedPoolMonsterClass = MonsterClass;
+}
+
+void ANYGameModeStage::ApplyWaveDataToSpawners(const FNYWaveDataRow& WaveData)
+{
+	const TSubclassOf<ANYMonsterBase> MonsterClass = ResolveMonsterClass(WaveData.MonsterType);
+	if (!MonsterClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ANYGameModeStage] Unknown MonsterType: %s"), *WaveData.MonsterType.ToString());
+		return;
+	}
+
+	EnsureMonsterPoolForClass(MonsterClass);
+
+	for (UNYMonsterSpawnComponent* SpawnComponent : ActiveSpawnComponents)
+	{
+		if (SpawnComponent)
+		{
+			SpawnComponent->UpdateSpawnerData(
+				MonsterClass,
+				WaveData.SpawnInterval,
+				WaveData.SpawnCountPerTick,
+				WaveData.SpawnRadius);
+		}
+	}
+}
+
+void ANYGameModeStage::GrantKillRewards(AController* KillerController, int32 ExpAmount, int32 GoldAmount)
+{
+	if (ExpAmount <= 0 && GoldAmount <= 0)
+	{
+		return;
+	}
+
+	auto GrantToPlayerState = [&](ANYPlayerStateStage* StagePS)
+	{
+		if (!StagePS || StagePS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+		{
+			return;
+		}
+
+		if (ExpAmount > 0)
+		{
+			StagePS->AddExp(ExpAmount);
+		}
+
+		if (GoldAmount > 0)
+		{
+			StagePS->AddGold(GoldAmount);
+		}
+	};
+
+	if (ANYPlayerStateStage* KillerPS = KillerController ? KillerController->GetPlayerState<ANYPlayerStateStage>() : nullptr)
+	{
+		GrantToPlayerState(KillerPS);
+		return;
+	}
+
+	// No valid killer: share rewards with every alive player (co-op fallback).
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			GrantToPlayerState(Cast<ANYPlayerStateStage>(PS));
+		}
+	}
 }

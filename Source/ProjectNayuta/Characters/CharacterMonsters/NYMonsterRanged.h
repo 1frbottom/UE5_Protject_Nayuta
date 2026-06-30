@@ -14,17 +14,17 @@ UCLASS()
 class PROJECTNAYUTA_API ANYMonsterRanged : public ANYMonsterBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	ANYMonsterRanged();
 
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void OnRep_ActivationData() override;
 
-// stat
-public:
 
+// Attack
 protected:
 	/* Must be designated in BP_MonsterRanged */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
@@ -50,12 +50,5 @@ private:
 	void CheckAndFire();
 
 	void FireProjectile();
-
-
-// multiplay
-public:
-	virtual void OnRep_ActivationData() override;
-
-
 
 };

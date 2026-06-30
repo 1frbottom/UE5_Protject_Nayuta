@@ -21,22 +21,6 @@ void ANYMonsterMelee::BeginPlay()
 
 }
 
-void ANYMonsterMelee::ProcessMeleeAttack()
-{
-	if (ActivationData.Target == nullptr)
-		return;
-
-	float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
-
-	float AttackRangeSq = FMath::Square(100.0f);
-
-	if (DistSq <= AttackRangeSq)
-	{
-		UGameplayStatics::ApplyDamage(ActivationData.Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
-	}
-
-}
-
 void ANYMonsterMelee::OnRep_ActivationData()
 {
     Super::OnRep_ActivationData();
@@ -52,4 +36,22 @@ void ANYMonsterMelee::OnRep_ActivationData()
     {
         GetWorldTimerManager().ClearTimer(AttackTimerHandle);
     }
+}
+
+
+// Attack
+void ANYMonsterMelee::ProcessMeleeAttack()
+{
+	if (ActivationData.Target == nullptr)
+		return;
+
+	float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
+
+	float AttackRangeSq = FMath::Square(100.0f);
+
+	if (DistSq <= AttackRangeSq)
+	{
+		UGameplayStatics::ApplyDamage(ActivationData.Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
+	}
+
 }

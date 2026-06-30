@@ -23,11 +23,15 @@ protected:
 	virtual void BeginPlay() override;
 
 
+// Component
 protected:
-	void ApplyMeleeDamageInRange();
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<USphereComponent> SphereComp;
+
+
+// Attack
+protected:
+	void ApplyMeleeDamageInRange();
 
 	/** Brief lifetime for melee VFX. */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
@@ -36,4 +40,5 @@ protected:
 	/** Total forward sweep arc in degrees (e.g. 90 = 45 deg each side). 360 = full circle. */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "10.0", ClampMax = "360.0"))
 	float MeleeSweepAngle = 60.0f;
+
 };

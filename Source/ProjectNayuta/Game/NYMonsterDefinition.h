@@ -17,6 +17,7 @@ class PROJECTNAYUTA_API UNYMonsterDefinition : public UDataAsset
 {
 	GENERATED_BODY()
 
+// Monster
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster")
 	FName MonsterType;
@@ -27,4 +28,5 @@ public:
 	/** When set, overrides ANYMonsterBase::RewardRowID for kill rewards. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster")
 	FName RewardRowIDOverride;
+
 };

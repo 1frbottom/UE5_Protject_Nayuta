@@ -38,6 +38,8 @@ void ANYAttackPlayerSword::BeginPlay()
 	}
 }
 
+
+// Attack
 void ANYAttackPlayerSword::ApplyMeleeDamageInRange()
 {
 	UWorld* World = GetWorld();

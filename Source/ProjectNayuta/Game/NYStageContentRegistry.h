@@ -16,6 +16,7 @@ class PROJECTNAYUTA_API UNYStageContentRegistry : public UDataAsset
 {
 	GENERATED_BODY()
 
+// Monster
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster")
 	TArray<TObjectPtr<UNYMonsterDefinition>> MonsterDefinitions;
@@ -24,4 +25,5 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	TSubclassOf<ANYMonsterBase> ResolveMonsterClass(FName MonsterType) const;
+
 };

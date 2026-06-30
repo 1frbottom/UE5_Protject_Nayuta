@@ -47,15 +47,6 @@ ANYMonsterBase::ANYMonsterBase()
 
 }
 
-void ANYMonsterBase::BeginPlay()
-{
-	Super::BeginPlay();
-	
-    CurrentHp = MaxHp;
-
-
-}
-
 void ANYMonsterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -85,6 +76,17 @@ void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
     DOREPLIFETIME(ANYMonsterBase, CurrentHp);
 }
 
+void ANYMonsterBase::BeginPlay()
+{
+	Super::BeginPlay();
+	
+    CurrentHp = MaxHp;
+
+
+}
+
+
+// Stat
 float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     if (!HasAuthority())
@@ -109,6 +111,17 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
     return DamageAmount;
 }
 
+void ANYMonsterBase::OnRep_CurrentHp()
+{
+    float HpRatio = FMath::Max(0.3f, CurrentHp / MaxHp);
+    
+    if (SphereComp)
+        SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
+
+}
+
+
+// Multiplay
 void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
 {
     if (HasAuthority())
@@ -162,13 +175,4 @@ void ANYMonsterBase::OnRep_ActivationData()
         SetActorEnableCollision(false);
         SetActorTickEnabled(false);
     }
-}
-
-void ANYMonsterBase::OnRep_CurrentHp()
-{
-    float HpRatio = FMath::Max(0.3f, CurrentHp / MaxHp);
-    
-    if (SphereComp)
-        SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
-
 }

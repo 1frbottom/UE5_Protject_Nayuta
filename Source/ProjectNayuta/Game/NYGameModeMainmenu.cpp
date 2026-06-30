@@ -6,7 +6,11 @@
 #include "Game/NYGameInstance.h"
 #include "Game/NYGameStateMainmenu.h"
 
-
+ANYGameModeMainmenu::ANYGameModeMainmenu()
+{
+	// Hosting uses ServerTravel("...?listen"); seamless travel ignores ?listen and never binds SteamNetDriver.
+	bUseSeamlessTravel = false;
+}
 
 void ANYGameModeMainmenu::InitGameState()
 {

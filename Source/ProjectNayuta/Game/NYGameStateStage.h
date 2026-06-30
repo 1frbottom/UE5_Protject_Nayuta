@@ -27,13 +27,12 @@ UCLASS()
 class PROJECTNAYUTA_API ANYGameStateStage : public ANYGameStateBase
 {
 	GENERATED_BODY()
-	
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 
-	// Phase
+// Phase
 public:
 	FORCEINLINE ENYGamePhase GetGamePhase() { return CurrPhase; }
 	void SetGamePhase(ENYGamePhase NewPhase);
@@ -46,7 +45,7 @@ protected:
 	void OnRep_CurrPhase();
 
 
-	// others
+// Info
 public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Info")
 	int32 ReplicatedKillCnt = 0;
@@ -57,9 +56,5 @@ public:
 	/** Shared stage config — readable on server and clients (not replicated; set per map). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Data")
 	TObjectPtr<UDataTable> WeaponLevelDataTable;
-
-
-
-
 
 };

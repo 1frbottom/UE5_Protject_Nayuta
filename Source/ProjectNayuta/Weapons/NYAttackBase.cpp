@@ -16,6 +16,8 @@ ANYAttackBase::ANYAttackBase()
 
 }
 
+
+// Attack
 void ANYAttackBase::InitAttackStat(float InDamage, float InRange)
 {
 	CurrentDamage = InDamage;

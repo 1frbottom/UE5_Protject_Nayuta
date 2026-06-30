@@ -7,6 +7,7 @@
 
 
 
+// UI
 void UNYHpBarWidgetMonster::UpdateHpBar(float InPercent)
 {
 	if (HpProgressBar)

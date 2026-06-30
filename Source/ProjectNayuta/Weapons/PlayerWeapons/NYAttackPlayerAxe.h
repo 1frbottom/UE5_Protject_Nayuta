@@ -20,6 +20,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+
+// Component
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UBoxComponent> BoxComp;
@@ -27,6 +29,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovementComp;
 
+
+// Attack
+protected:
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
 };

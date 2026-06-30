@@ -12,17 +12,17 @@ UCLASS()
 class PROJECTNAYUTA_API ANYMonsterMelee : public ANYMonsterBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	ANYMonsterMelee();
 
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void OnRep_ActivationData() override;
 
-// stat
-public:
 
+// Attack
 protected:
 	UPROPERTY(EditAnywhere, Category = "Attack")
 	float AttackDamage = 10.0f;
@@ -35,11 +35,5 @@ private:
 
 	UFUNCTION()
 	void ProcessMeleeAttack();
-
-
-// multiplay
-public:
-	virtual void OnRep_ActivationData() override;
-
 
 };

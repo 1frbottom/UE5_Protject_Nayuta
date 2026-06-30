@@ -24,6 +24,15 @@ void ANYPlayerControllerStage::BeginPlay()
 
 }
 
+void ANYPlayerControllerStage::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+
+
+}
+
+
+// UI
 void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
 {
     // only local
@@ -35,7 +44,7 @@ void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
         // if needed : reward/gameover widget close, return to Playing UI
         break;
     case ENYGamePhase::Rewarding:
-        ShowRewardUI();
+        // Reward UI opens from OnRep_PendingRewardOffers when offers replicate.
         break;
     case ENYGamePhase::GameOver:
         ShowGameOverUI();
@@ -43,13 +52,6 @@ void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
     default:
         break;
     }
-}
-
-void ANYPlayerControllerStage::SetupInputComponent()
-{
-    Super::SetupInputComponent();
-
-
 }
 
 void ANYPlayerControllerStage::TogglePause()
@@ -91,11 +93,25 @@ void ANYPlayerControllerStage::TogglePause()
 
 }
 
+
+// Reward
+void ANYPlayerControllerStage::ConfirmRewardSelection(int32 SlotIndex)
+{
+    Server_SelectReward(SlotIndex);
+}
+
 void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeIndex)
 {
     ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
-    if (PS->GetPlayerPhase() != ENYPlayerPhase::Rewarding)
+    if (!PS || PS->GetPlayerPhase() != ENYPlayerPhase::Rewarding)
+    {
         return;
+    }
+
+    if (!PS->TrySelectReward(UpgradeIndex))
+    {
+        return;
+    }
 
     if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
     {
@@ -103,6 +119,8 @@ void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeI
     }
 }
 
+
+// GameOver
 void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
 {
     ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
@@ -114,4 +132,3 @@ void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
         GM->AddRetryVote();
     }
 }
-

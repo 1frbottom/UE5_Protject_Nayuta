@@ -17,17 +17,17 @@ UCLASS()
 class PROJECTNAYUTA_API ANYPlayerStateMainmenu : public ANYPlayerStateBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	virtual void OnRep_PlayerId() override;
 
-	// MultiPlay
+
+// Multiplay
 public:
 	FORCEINLINE bool GetIsReadyLobby() const { return bIsReadyLobby; }
 	void SetIsReadyLobby(bool NewReady);
-
-	virtual void OnRep_PlayerId() override;
 
 	UPROPERTY(BlueprintAssignable, Category = "Multiplay|Events")
 	FOnReadyStateChanged OnReadyStateChangedDelegate;
@@ -38,6 +38,5 @@ protected:
 
 	UFUNCTION()
 	void OnRep_bIsReadyLobby();
-
 
 };

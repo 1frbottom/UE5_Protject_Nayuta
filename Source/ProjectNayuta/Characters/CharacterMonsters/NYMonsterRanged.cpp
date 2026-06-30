@@ -23,6 +23,25 @@ void ANYMonsterRanged::BeginPlay()
 
 }
 
+void ANYMonsterRanged::OnRep_ActivationData()
+{
+	Super::OnRep_ActivationData();
+
+	if (ActivationData.Target != nullptr)
+	{
+		if (HasAuthority())
+		{
+			GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
+		}
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
+	}
+}
+
+
+// Attack
 void ANYMonsterRanged::CheckAndFire()
 {
 	if (!ActivationData.Target)
@@ -57,22 +76,5 @@ void ANYMonsterRanged::FireProjectile()
 	if (Projectile)
 	{
 		Projectile->InitAttackStat(AttackDamage, AttackRange);
-	}
-}
-
-void ANYMonsterRanged::OnRep_ActivationData()
-{
-	Super::OnRep_ActivationData();
-
-	if (ActivationData.Target != nullptr)
-	{
-		if (HasAuthority())
-		{
-			GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
-		}
-	}
-	else
-	{
-		GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
 	}
 }

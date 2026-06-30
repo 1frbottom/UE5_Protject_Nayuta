@@ -7,6 +7,7 @@
 #include "Engine/DataTable.h"
 
 #include "Game/NYStageDataRows.h"
+#include "Game/NYRewardTypes.h"
 #include "Player/NYPlayerStateStage.h"
 
 #include "NYGameModeStage.generated.h"
@@ -15,9 +16,12 @@
 
 class ANYPlayerControllerStage;
 class ANYMonsterBase;
+class ANYCharacterPlayer;
 class UNYMonsterPoolComponent;
 class UNYMonsterSpawnComponent;
 class UNYStageContentRegistry;
+class UNYWeaponComponent;
+class UNYWeaponDefinition;
 
 /**
  * 
@@ -26,15 +30,17 @@ UCLASS()
 class PROJECTNAYUTA_API ANYGameModeStage : public ANYGameModeBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	ANYGameModeStage();
 
+protected:
 	virtual void BeginPlay() override;
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
-	// Wave
+
+// Wave
 public:
 	UPROPERTY(EditDefaultsOnly, Category = "Wave")
 	TObjectPtr<UDataTable> WaveDataTable;
@@ -44,6 +50,13 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Data")
 	TObjectPtr<UDataTable> MonsterRewardDataTable;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	TObjectPtr<UDataTable> RewardPoolDataTable;
+
+	/** Number of choices offered per alive player each reward phase. */
+	UPROPERTY(EditDefaultsOnly, Category = "Reward", meta = (ClampMin = "1"))
+	int32 RewardOfferCount = 3;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Data")
 	TObjectPtr<UNYStageContentRegistry> StageContentRegistry;
@@ -78,19 +91,23 @@ protected:
 	int32 CountPlayersInPhase(ENYPlayerPhase Phase) const;
 
 
-	// Reward
+// Reward
 public:
 	int32 RewardedPlayerCnt = 0;
 	FTimerHandle RewardTimeoutHandle;
 
 	void OnPlayerRewarded();
 
+	/** Server: advance wave when every connected player is Ready. */
+	void TryAdvanceWaveAfterRewards();
+
 protected:
 	void StartRewardPhase();
 
+	TArray<FNYRewardOffer> GenerateRewardOffers(ANYPlayerStateStage* PlayerState) const;
 
 
-	// Retry
+// Retry
 public:
 	void AddRetryVote();
 
@@ -98,21 +115,21 @@ protected:
 	int32 RetryVoteCount = 0;
 
 
-	// Spawner / pool (server-only via GameMode)
+// Spawner
 public:
 	FORCEINLINE UNYMonsterPoolComponent* GetMonsterPoolComponent() const { return MonsterPoolComponent; }
 
 	void RegisterSpawnComponent(UNYMonsterSpawnComponent* SpawnComponent);
-
 
 protected:
 	/** Default subobject; pre-warms monsters on BeginPlay (server only). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawner")
 	TObjectPtr<UNYMonsterPoolComponent> MonsterPoolComponent;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Spawner")
-	int32 InitialPoolSize = 100;
-	
+	/** Pre-warmed monster count; sized for peak concurrent spawns across all spawners. */
+	UPROPERTY(EditDefaultsOnly, Category = "Spawner", meta = (ClampMin = "1"))
+	int32 InitialPoolSize = 500;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNYMonsterSpawnComponent>> ActiveSpawnComponents;
 
@@ -127,7 +144,5 @@ protected:
 
 	UPROPERTY(Transient)
 	TSubclassOf<ANYMonsterBase> CachedPoolMonsterClass;
-
-
 
 };

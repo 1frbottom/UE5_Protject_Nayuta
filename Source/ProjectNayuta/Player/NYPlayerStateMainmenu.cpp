@@ -20,16 +20,6 @@ void ANYPlayerStateMainmenu::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 
 }
 
-void ANYPlayerStateMainmenu::SetIsReadyLobby(bool NewReady)
-{
-    if (HasAuthority())
-    {
-        bIsReadyLobby = NewReady;
-
-        OnRep_bIsReadyLobby();
-    }
-}
-
 void ANYPlayerStateMainmenu::OnRep_PlayerId()
 {
     Super::OnRep_PlayerId();
@@ -38,6 +28,18 @@ void ANYPlayerStateMainmenu::OnRep_PlayerId()
     if (ANYGameStateMainmenu* GS = Cast<ANYGameStateMainmenu>(GetWorld()->GetGameState()))
     {
         GS->OnPlayerListChangedDelegate.Broadcast();
+    }
+}
+
+
+// Multiplay
+void ANYPlayerStateMainmenu::SetIsReadyLobby(bool NewReady)
+{
+    if (HasAuthority())
+    {
+        bIsReadyLobby = NewReady;
+
+        OnRep_bIsReadyLobby();
     }
 }
 

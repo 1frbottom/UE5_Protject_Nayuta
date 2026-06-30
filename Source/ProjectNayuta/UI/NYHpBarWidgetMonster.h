@@ -12,14 +12,14 @@ UCLASS()
 class PROJECTNAYUTA_API UNYHpBarWidgetMonster : public UUserWidget
 {
 	GENERATED_BODY()
-	
+
+
+// UI
 public:
 	void UpdateHpBar(float InPercent);
 
 protected:
-	// The name of the ProgressBar in the UMG Blueprint must be exactly the same for automatic binding
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> HpProgressBar;
-
 
 };

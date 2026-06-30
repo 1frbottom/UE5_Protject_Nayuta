@@ -7,6 +7,7 @@
 
 class UDataTable;
 
+// WeaponLevel
 namespace NYWeaponLevel
 {
 	int32 GetMaxLevel(const UDataTable* WeaponLevelDataTable, FName WeaponID);

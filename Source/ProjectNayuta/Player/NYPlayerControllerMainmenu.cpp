@@ -19,6 +19,8 @@ void ANYPlayerControllerMainmenu::BeginPlay()
 
 }
 
+
+// Multiplay
 void ANYPlayerControllerMainmenu::Server_ToggleReady_Implementation()
 {
     if (ANYPlayerStateMainmenu* PS = Cast<ANYPlayerStateMainmenu>(PlayerState))

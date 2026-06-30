@@ -22,6 +22,9 @@ class PROJECTNAYUTA_API UNYMonsterPoolComponent : public UActorComponent
 public:
 	UNYMonsterPoolComponent();
 
+
+// Pool
+public:
 	/** Pre-spawns PoolSize monsters, hides them, and stores them in InactivePool. */
 	void InitializePool(TSubclassOf<ANYMonsterBase> MonsterClass, int32 PoolSize);
 
@@ -35,4 +38,5 @@ protected:
 	/** Monsters waiting to be activated (LIFO via Pop). */
 	UPROPERTY()
 	TArray<TObjectPtr<ANYMonsterBase>> InactivePool;
+
 };

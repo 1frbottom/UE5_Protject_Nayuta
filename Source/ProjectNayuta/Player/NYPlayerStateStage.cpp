@@ -9,6 +9,7 @@
 #include "Game/NYGameModeStage.h"
 #include "Player/NYPlayerControllerStage.h"
 #include "Characters/CharacterPlayers/NYCharacterPlayer.h"
+#include "Weapons/NYWeaponComponent.h"
 
 
 
@@ -29,8 +30,13 @@ void ANYPlayerStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ANYPlayerStateStage, MoveSpeed);
     DOREPLIFETIME(ANYPlayerStateStage, bIsSprinting);
 
+    DOREPLIFETIME_CONDITION(ANYPlayerStateStage, PendingRewardOffers, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(ANYPlayerStateStage, bHasSelectedReward, COND_OwnerOnly);
+
 }
 
+
+// Phase
 void ANYPlayerStateStage::SetPlayerPhase(ENYPlayerPhase NewPhase)
 {
     if (!HasAuthority())
@@ -79,105 +85,19 @@ void ANYPlayerStateStage::OnRep_CurrPhase()
     }
     else if (CurrPhase == ENYPlayerPhase::Rewarding)
     {
-
+        TryShowRewardUI();
     }
-
-
-
-}
-
-void ANYPlayerStateStage::ApplyDamage(float DamageAmount)
-{
-    if (!HasAuthority() || !(CurrPhase == ENYPlayerPhase::Alive))
-        return;
-
-    CurrHp = FMath::Clamp(CurrHp - DamageAmount, 0.0f, MaxHP);
-
-    OnRep_CurrHp();
-
-    if (CurrHp <= 0.0f)
+    else if (CurrPhase == ENYPlayerPhase::Ready)
     {
-        SetPlayerPhase(ENYPlayerPhase::Dead);
-
-        // GameMode
-        if (ANYGameModeStage* GM = GetWorld()->GetAuthGameMode<ANYGameModeStage>())
-        {
-            GM->OnPlayerDied(Cast<ANYPlayerControllerStage>(GetPlayerController()));
-        }
-
-
-    }
-}
-
-void ANYPlayerStateStage::SetCurrHp(float InHp)
-{
-    if (!HasAuthority())
-        return;
-
-    CurrHp = InHp;
-    OnRep_CurrHp();
-}
-
-void ANYPlayerStateStage::OnRep_CurrHp()
-{
-    // for party hpbar ui
-    if (ANYPlayerControllerStage* LocalPC = Cast<ANYPlayerControllerStage>(GetWorld()->GetFirstPlayerController()))
-    {
-        float HpPercent = (MaxHP > 0.0f) ? (CurrHp / MaxHP) : 0.0f;
-
-        // If it's my PC, update my Hpbar
-        if (LocalPC->PlayerState == this)
-        {
-            LocalPC->UpdatePlayerHpUI(HpPercent);
-        }
-        else
-        {
-
-
-        }
-
-        // debug
-        //GEngine->AddOnScreenDebugMessage(
-        //    -1, 5.f, FColor::Cyan,
-        //    FString::Printf(TEXT("MaxHp : %f, CurrHp : %f"), MaxHP, CurrHp)
-        //);
-    }
-}
-
-void ANYPlayerStateStage::RefreshMaxExpForCurrentLevel()
-{
-    MaxExp = 0;
-
-    if (const ANYGameModeStage* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ANYGameModeStage>() : nullptr)
-    {
-        MaxExp = GM->GetRequiredExpForLevel(CurrPlayerLv);
-    }
-}
-
-void ANYPlayerStateStage::ResetRunStats()
-{
-    if (!HasAuthority())
-    {
-        return;
+        PendingRewardOffers.Empty();
     }
 
-    CurrPlayerLv = 1;
-    CurrExp = 0;
-    CurrGold = 0;
-    RefreshMaxExpForCurrentLevel();
 
-    LastNotifiedPlayerLevel = CurrPlayerLv;
 
-    if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn()))
-    {
-        Character->ResetWeaponForNewRun();
-    }
-
-    OnRep_CurrPlayerLv();
-    OnRep_CurrExp();
-    OnRep_CurrGold();
 }
 
+
+// Level
 void ANYPlayerStateStage::AddExp(int32 InExp)
 {
     if (!HasAuthority() || InExp <= 0)
@@ -233,6 +153,40 @@ void ANYPlayerStateStage::AddGold(int32 InGold)
 
     CurrGold += InGold;
     OnRep_CurrGold();
+}
+
+void ANYPlayerStateStage::ResetRunStats()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    CurrPlayerLv = 1;
+    CurrExp = 0;
+    CurrGold = 0;
+    RefreshMaxExpForCurrentLevel();
+
+    LastNotifiedPlayerLevel = CurrPlayerLv;
+
+    if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn()))
+    {
+        Character->ResetWeaponForNewRun();
+    }
+
+    OnRep_CurrPlayerLv();
+    OnRep_CurrExp();
+    OnRep_CurrGold();
+}
+
+void ANYPlayerStateStage::RefreshMaxExpForCurrentLevel()
+{
+    MaxExp = 0;
+
+    if (const ANYGameModeStage* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ANYGameModeStage>() : nullptr)
+    {
+        MaxExp = GM->GetRequiredExpForLevel(CurrPlayerLv);
+    }
 }
 
 void ANYPlayerStateStage::NotifyLocalExpUI()
@@ -293,6 +247,79 @@ void ANYPlayerStateStage::OnRep_CurrGold()
     NotifyLocalGoldUI();
 }
 
+
+// Hp
+void ANYPlayerStateStage::SetCurrHp(float InHp)
+{
+    if (!HasAuthority())
+        return;
+
+    CurrHp = InHp;
+    OnRep_CurrHp();
+}
+
+void ANYPlayerStateStage::ApplyDamage(float DamageAmount)
+{
+    if (!HasAuthority() || !(CurrPhase == ENYPlayerPhase::Alive))
+        return;
+
+    CurrHp = FMath::Clamp(CurrHp - DamageAmount, 0.0f, MaxHP);
+
+    OnRep_CurrHp();
+
+    if (CurrHp <= 0.0f)
+    {
+        SetPlayerPhase(ENYPlayerPhase::Dead);
+
+        // GameMode
+        if (ANYGameModeStage* GM = GetWorld()->GetAuthGameMode<ANYGameModeStage>())
+        {
+            GM->OnPlayerDied(Cast<ANYPlayerControllerStage>(GetPlayerController()));
+        }
+
+
+    }
+}
+
+void ANYPlayerStateStage::AddMaxHp(float InAmount)
+{
+    if (!HasAuthority() || InAmount <= 0.0f)
+    {
+        return;
+    }
+
+    MaxHP += InAmount;
+    SetCurrHp(MaxHP);
+}
+
+void ANYPlayerStateStage::OnRep_CurrHp()
+{
+    // for party hpbar ui
+    if (ANYPlayerControllerStage* LocalPC = Cast<ANYPlayerControllerStage>(GetWorld()->GetFirstPlayerController()))
+    {
+        float HpPercent = (MaxHP > 0.0f) ? (CurrHp / MaxHP) : 0.0f;
+
+        // If it's my PC, update my Hpbar
+        if (LocalPC->PlayerState == this)
+        {
+            LocalPC->UpdatePlayerHpUI(HpPercent);
+        }
+        else
+        {
+
+
+        }
+
+        // debug
+        //GEngine->AddOnScreenDebugMessage(
+        //    -1, 5.f, FColor::Cyan,
+        //    FString::Printf(TEXT("MaxHp : %f, CurrHp : %f"), MaxHP, CurrHp)
+        //);
+    }
+}
+
+
+// MoveSpeed
 void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)
 {
     if (!HasAuthority())
@@ -300,11 +327,6 @@ void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)
 
     MoveSpeed += InMoveSpeed;
     OnRep_MoveSpeed();
-}
-
-void ANYPlayerStateStage::OnRep_MoveSpeed()
-{
-    ApplyMoveSpeedToPawn();
 }
 
 void ANYPlayerStateStage::SetSprinting(bool bSprint)
@@ -317,10 +339,6 @@ void ANYPlayerStateStage::SetSprinting(bool bSprint)
         return;
     bIsSprinting = bSprint;
     OnRep_bIsSprinting(); // 리슨 서버 즉시 반영
-}
-void ANYPlayerStateStage::OnRep_bIsSprinting()
-{
-    ApplyMoveSpeedToPawn();
 }
 
 void ANYPlayerStateStage::ApplyMoveSpeedToPawn()
@@ -337,4 +355,116 @@ void ANYPlayerStateStage::ApplyMoveSpeedToPawn()
         EffectiveSpeed += SprintSpeedBonus;
     }
     Character->GetCharacterMovement()->MaxWalkSpeed = EffectiveSpeed;
+}
+
+void ANYPlayerStateStage::OnRep_MoveSpeed()
+{
+    ApplyMoveSpeedToPawn();
+}
+
+void ANYPlayerStateStage::OnRep_bIsSprinting()
+{
+    ApplyMoveSpeedToPawn();
+}
+
+
+// Reward
+void ANYPlayerStateStage::SetPendingRewardOffers(const TArray<FNYRewardOffer>& InOffers)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    PendingRewardOffers = InOffers;
+    bHasSelectedReward = false;
+    OnRep_PendingRewardOffers();
+}
+
+bool ANYPlayerStateStage::TrySelectReward(int32 SlotIndex)
+{
+    if (!HasAuthority() || bHasSelectedReward || CurrPhase != ENYPlayerPhase::Rewarding)
+    {
+        return false;
+    }
+
+    if (!PendingRewardOffers.IsValidIndex(SlotIndex))
+    {
+        return false;
+    }
+
+    ApplyReward(PendingRewardOffers[SlotIndex]);
+
+    bHasSelectedReward = true;
+    PendingRewardOffers.Empty();
+    SetPlayerPhase(ENYPlayerPhase::Ready);
+
+    return true;
+}
+
+void ANYPlayerStateStage::OnRep_PendingRewardOffers()
+{
+    TryShowRewardUI();
+}
+
+void ANYPlayerStateStage::ApplyReward(const FNYRewardOffer& Offer)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    switch (Offer.RewardType)
+    {
+    case ENYRewardType::StatMaxHp:
+        AddMaxHp(Offer.StatValue);
+        break;
+
+    case ENYRewardType::StatMoveSpeed:
+        AddMoveSpeed(Offer.StatValue);
+        break;
+
+    case ENYRewardType::NewWeapon:
+        if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn()))
+        {
+            if (UNYWeaponComponent* WeaponComp = Character->GetWeaponComponent())
+            {
+                if (Offer.WeaponDefinition)
+                {
+                    WeaponComp->SetSecondaryWeaponDefinition(Offer.WeaponDefinition);
+                }
+            }
+        }
+        break;
+
+    case ENYRewardType::WeaponUpgrade:
+        if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn()))
+        {
+            if (UNYWeaponComponent* WeaponComp = Character->GetWeaponComponent())
+            {
+                const bool bPrimary = Offer.WeaponSlot == ENYRewardWeaponSlot::Primary;
+                WeaponComp->LevelUpSlot(bPrimary);
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
+void ANYPlayerStateStage::TryShowRewardUI()
+{
+    if (CurrPhase != ENYPlayerPhase::Rewarding || PendingRewardOffers.Num() <= 0)
+    {
+        return;
+    }
+
+    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    {
+        if (PC->IsLocalPlayerController())
+        {
+            PC->ShowRewardUI(PendingRewardOffers);
+        }
+    }
 }

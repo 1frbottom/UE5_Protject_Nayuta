@@ -132,6 +132,8 @@ protected:
 
 // Weapon
 public:
+	FORCEINLINE UNYWeaponComponent* GetWeaponComponent() const { return DefaultWeaponComp; }
+
 	void ResetWeaponForNewRun();
 
 protected:

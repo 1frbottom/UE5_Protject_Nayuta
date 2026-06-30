@@ -44,11 +44,15 @@ void ANYPlayerControllerBase::SetupInputComponent()
     }
 }
 
+
+// Control
 void ANYPlayerControllerBase::SetMouseSensitivity(float NewValue)
 {
     MouseSensitivity = NewValue;
 }
 
+
+// Pause
 void ANYPlayerControllerBase::TogglePause()
 {
     // [Common Logic] If the setting window is open, close it and initialize the reference

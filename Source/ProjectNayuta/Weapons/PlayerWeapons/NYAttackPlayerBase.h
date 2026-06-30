@@ -13,10 +13,8 @@ UCLASS()
 class PROJECTNAYUTA_API ANYAttackPlayerBase : public ANYAttackBase
 {
 	GENERATED_BODY()
-	
+
 protected:
 	virtual void BeginPlay() override;
-
-
 
 };

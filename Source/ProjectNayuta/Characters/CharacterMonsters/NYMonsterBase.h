@@ -56,9 +56,12 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<class UStaticMeshComponent> SphereComp;
 
+
 // Stat
 public:
     FORCEINLINE FName GetRewardRowID() const { return RewardRowID; }
+
+    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
 protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
@@ -81,10 +84,8 @@ protected:
     void OnRep_CurrentHp();
 
 
-// Multiplayer
+// Multiplay
 public:
-    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
-
     /** Authority-only: pull from pool and replicate activation to clients. */
     void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
     void DeactivateOnServer();
@@ -95,7 +96,5 @@ protected:
 
     UFUNCTION()
     virtual void OnRep_ActivationData();
-
-
 
 };

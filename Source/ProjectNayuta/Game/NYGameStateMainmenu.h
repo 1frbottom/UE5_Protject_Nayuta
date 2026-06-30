@@ -20,21 +20,17 @@ class PROJECTNAYUTA_API ANYGameStateMainmenu : public ANYGameStateBase
 {
 	GENERATED_BODY()
 
-public:
-
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 
-// Session Info
+// SessionInfo
 public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplay")
 	FName CurrentSessionName;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplay")
 	int32 MaxPlayers;
-
-protected:
 
 
 // PlayerState
@@ -44,11 +40,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Multiplay")
 	FOnPlayerListChanged OnPlayerListChangedDelegate;
-	
+
 protected:
 	virtual void AddPlayerState(APlayerState* PlayerState) override;
 	virtual void RemovePlayerState(APlayerState* PlayerState) override;
-
-
 
 };

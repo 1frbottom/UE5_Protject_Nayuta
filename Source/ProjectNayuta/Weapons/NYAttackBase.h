@@ -16,21 +16,19 @@ UCLASS()
 class PROJECTNAYUTA_API ANYAttackBase : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	ANYAttackBase();
 
-public:	
 	virtual void InitAttackStat(float InDamage, float InRange);
 
+
+// Attack
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Attack")
 	float CurrentDamage;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Attack")
 	float CurrentRange;
-
-
-
 
 };

@@ -18,6 +18,8 @@ void ANYGameStateMainmenu::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 }
 
+
+// PlayerState
 TArray<APlayerState*> ANYGameStateMainmenu::GetSortedPlayerArray()
 {
     TArray<APlayerState*> SortedArray = PlayerArray;

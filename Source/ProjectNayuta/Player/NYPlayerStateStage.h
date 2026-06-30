@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Player/NYPlayerStateBase.h"
+#include "Game/NYRewardTypes.h"
 #include "NYPlayerStateStage.generated.h"
 
 
@@ -25,12 +26,12 @@ UCLASS()
 class PROJECTNAYUTA_API ANYPlayerStateStage : public ANYPlayerStateBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 
-	// Phase
+// Phase
 public:
 	FORCEINLINE ENYPlayerPhase GetPlayerPhase() const { return CurrPhase; }
 	void SetPlayerPhase(ENYPlayerPhase NewPhase);
@@ -43,7 +44,7 @@ protected:
 	void OnRep_CurrPhase();
 
 
-	// Level / currency (persist for the stage run; reset on ServerTravel ?Restart)
+// Level
 public:
 	FORCEINLINE int32 GetCurrPlayerLv() const { return CurrPlayerLv; }
 	FORCEINLINE int32 GetCurrExp() const { return CurrExp; }
@@ -65,43 +66,65 @@ protected:
 	/** Local-only: suppresses false OnPlayerLevelUp on first replicate / after ResetRunStats. */
 	int32 LastNotifiedPlayerLevel = 0;
 
-	// Hp
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
+	int32 MaxExp = 100;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrExp, BlueprintReadOnly, Category = "Stat")
+	int32 CurrExp = 0;
+
+	UFUNCTION()
+	void OnRep_CurrExp();
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrPlayerLv, BlueprintReadOnly, Category = "Stat")
+	int32 CurrPlayerLv = 1;
+
+	UFUNCTION()
+	void OnRep_CurrPlayerLv();
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrGold, BlueprintReadOnly, Category = "Stat")
+	int32 CurrGold = 0;
+
+	UFUNCTION()
+	void OnRep_CurrGold();
+
+
+// Hp
 public:
 	FORCEINLINE float GetMaxHp() const { return MaxHP; }
-
 	FORCEINLINE float GetCurrHp() const { return CurrHp; }
+
 	void SetCurrHp(float InHp);
 
 	//FORCEINLINE bool GetIsDead() const { return bIsDead; }
 	//void SetbIsDead(bool InIsDead);
 
 	void ApplyDamage(float InDamage);
+	void AddMaxHp(float InAmount);
 
 protected:
 	UPROPERTY(Replicated, EditAnywhere, Category = "Stat")
 	//float MaxHP = 100.0f;
 	float MaxHP = 10000.0f;
 
-
 	UPROPERTY(ReplicatedUsing = OnRep_CurrHp, EditAnywhere, Category = "Stat")
 	//float CurrHp = 100.0f;
 	float CurrHp = 10000.0f;
-
 
 	UFUNCTION()
 	void OnRep_CurrHp();
 
 
-	// MoveSpeed
+// MoveSpeed
 public:
 	FORCEINLINE float GetMoveSpeed() const { return MoveSpeed; }
+
 	void AddMoveSpeed(float InMoveSpeed);
 
 	static constexpr float SprintSpeedBonus = 250.f;
 	void SetSprinting(bool bSprint);
 	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
 
-	// MoveSpeed + Sprint Bonus Reflected to Pawn CMC
+	/** MoveSpeed + Sprint Bonus Reflected to Pawn CMC */
 	void ApplyMoveSpeedToPawn();
 
 protected:
@@ -117,29 +140,29 @@ protected:
 	UFUNCTION()
 	void OnRep_bIsSprinting();
 
-	// Exp
-protected:
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
-	int32 MaxExp = 100;
 
-	UPROPERTY(ReplicatedUsing = OnRep_CurrExp, BlueprintReadOnly, Category = "Stat")
-	int32 CurrExp = 0;
-	UFUNCTION()
-	void OnRep_CurrExp();
-
-	UPROPERTY(ReplicatedUsing = OnRep_CurrPlayerLv, BlueprintReadOnly, Category = "Stat")
-	int32 CurrPlayerLv = 1;
-	UFUNCTION()
-	void OnRep_CurrPlayerLv();
-
-	UPROPERTY(ReplicatedUsing = OnRep_CurrGold, BlueprintReadOnly, Category = "Stat")
-	int32 CurrGold = 0;
-	UFUNCTION()
-	void OnRep_CurrGold();
-
-
-	// WeaponComponent
+// Reward
 public:
+	FORCEINLINE bool HasSelectedReward() const { return bHasSelectedReward; }
+	FORCEINLINE const TArray<FNYRewardOffer>& GetPendingRewardOffers() const { return PendingRewardOffers; }
+
+	/** Server: assign wave reward choices for the owning player. */
+	void SetPendingRewardOffers(const TArray<FNYRewardOffer>& InOffers);
+
+	/** Server: validate selection, apply reward, and move to Ready. */
+	bool TrySelectReward(int32 SlotIndex);
 
 protected:
+	UPROPERTY(ReplicatedUsing = OnRep_PendingRewardOffers, BlueprintReadOnly, Category = "Reward")
+	TArray<FNYRewardOffer> PendingRewardOffers;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Reward")
+	bool bHasSelectedReward = false;
+
+	UFUNCTION()
+	void OnRep_PendingRewardOffers();
+
+	void ApplyReward(const FNYRewardOffer& Offer);
+	void TryShowRewardUI();
+
 };

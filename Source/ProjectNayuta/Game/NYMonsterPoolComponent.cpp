@@ -9,6 +9,8 @@ UNYMonsterPoolComponent::UNYMonsterPoolComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+
+// Pool
 void UNYMonsterPoolComponent::InitializePool(TSubclassOf<ANYMonsterBase> MonsterClass, int32 PoolSize)
 {
 	UWorld* World = GetWorld();
