@@ -34,6 +34,11 @@ public:
 // Phase
 public:
 	FORCEINLINE ENYPlayerPhase GetPlayerPhase() const { return CurrPhase; }
+	/** Alive or Ready (post-reward wait) — pawn accepts move/combat input. */
+	FORCEINLINE bool CanControlPawn() const
+	{
+		return CurrPhase == ENYPlayerPhase::Alive || CurrPhase == ENYPlayerPhase::Ready;
+	}
 	void SetPlayerPhase(ENYPlayerPhase NewPhase);
 
 protected:

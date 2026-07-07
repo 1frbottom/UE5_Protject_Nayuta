@@ -16,7 +16,8 @@ enum class ENYGamePhase : uint8
 	Waiting,
 	Playing,
 	Rewarding,
-	GameOver
+	GameOver,
+	GameClear
 
 };
 
@@ -52,6 +53,10 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Info")
 	int32 ReplicatedTargetKillCnt = 0;
+
+	/** Waves cleared when GameClear phase begins (set on server). */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Info")
+	int32 ReplicatedClearedWaveCount = 0;
 
 	/** Shared stage config — readable on server and clients (not replicated; set per map). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Data")

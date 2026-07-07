@@ -14,7 +14,6 @@
 
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 
 #include "Net/UnrealNetwork.h"      // DOREPLIFETIME
 
@@ -108,18 +107,6 @@ void ANYCharacterPlayer::PawnClientRestart()
     InitPlayerState();
 
     PC_ref = Cast<ANYPlayerControllerStage>(GetController());
-    // add IMC into PlayerController
-    if (PC_ref)
-    {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC_ref->GetLocalPlayer()))
-        {
-            if (DefaultMappingContext)
-            {
-                Subsystem->AddMappingContext(DefaultMappingContext, 0);
-            }
-        }
-    }
-
 }
 
 void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -194,7 +181,7 @@ void ANYCharacterPlayer::Look(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 {
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS_ref || !PS_ref->CanControlPawn())
         return;
 
     FVector2D MovementVector = Value.Get<FVector2D>();
@@ -216,7 +203,7 @@ void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Sprint()
 {
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS_ref || !PS_ref->CanControlPawn())
         return;
 
     if (HasAuthority())
@@ -252,7 +239,7 @@ void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
 
 void ANYCharacterPlayer::SwapWeaponSlots()
 {
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS_ref || !PS_ref->CanControlPawn())
     {
         return;
     }
@@ -274,7 +261,7 @@ void ANYCharacterPlayer::Server_SwapWeaponSlots_Implementation()
 {
     if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
     {
-        if (PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+        if (!PS->CanControlPawn())
         {
             return;
         }
@@ -330,7 +317,7 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
         PS_ref = GetPlayerState<ANYPlayerStateStage>();
     }
 
-    if (!PS_ref || PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS_ref || !PS_ref->CanControlPawn())
         return;
 
     const UCapsuleComponent* PlayerCapsule = GetCapsuleComponent();

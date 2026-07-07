@@ -260,10 +260,10 @@ void UNYWeaponComponent::FireAttack()
 		return;
 	}
 
-	// Server: only fire while the owning player is in the Alive phase.
+	// Server: only fire while the owning player can control their pawn.
 	if (ANYPlayerStateStage* PS = OwnerPawn->GetPlayerState<ANYPlayerStateStage>())
 	{
-		if (PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+		if (!PS->CanControlPawn())
 		{
 			return;
 		}

@@ -16,6 +16,7 @@ void ANYGameStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 	DOREPLIFETIME(ANYGameStateStage, ReplicatedKillCnt);
 	DOREPLIFETIME(ANYGameStateStage, ReplicatedTargetKillCnt);
+	DOREPLIFETIME(ANYGameStateStage, ReplicatedClearedWaveCount);
 
 
 }

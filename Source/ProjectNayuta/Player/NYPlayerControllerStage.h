@@ -9,12 +9,15 @@
 
 
 
-/**
- * 
- */
-
 class UInputAction;
 class UInputMappingContext;
+
+UENUM()
+enum class ENYInputConfig : uint8
+{
+	Gameplay,
+	ModalUI
+};
 
 UCLASS()
 class PROJECTNAYUTA_API ANYPlayerControllerStage : public ANYPlayerControllerBase
@@ -23,6 +26,7 @@ class PROJECTNAYUTA_API ANYPlayerControllerStage : public ANYPlayerControllerBas
 
 protected:
     virtual void BeginPlay() override;
+    virtual void OnPossess(APawn* InPawn) override;
     virtual void SetupInputComponent() override;
 
 
@@ -59,6 +63,9 @@ protected:
     UPROPERTY(BlueprintReadWrite, Category = "UI")
     bool bIsPaused = false;
 
+    /** Client: single entry point for IMC, input mode, cursor, and pawn input. */
+    void ApplyInputConfig(ENYInputConfig Config);
+
 
 // Reward
 public:
@@ -88,6 +95,15 @@ public:
 
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Server")
     void Server_RequestRetry();
+
+
+// GameClear
+public:
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void ShowGameClearUI(int32 WavesCleared, int32 GoldEarned);
+
+    UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Server")
+    void Server_RequestReturnToMainMenu();
 
 
 // Multiplay

@@ -209,16 +209,7 @@ void ANYGameModeStage::StartNextWave()
 		}
 		else
 		{
-			// TODO: GameClear();
-
-			// debug
-			GEngine->AddOnScreenDebugMessage(
-				-1, 5.f, FColor::Red,
-				FString::Printf(TEXT("GAME CLEAR!!!"))
-			);
-
-			UE_LOG(LogTemp, Error, TEXT("[DEBUG] GAME CLEAR!!! DataTable End Reached."));
-
+			GameClear();
 			return;
 		}
 	}
@@ -277,6 +268,35 @@ void ANYGameModeStage::GameOver()
 	SetSpawnersActive(false);
 
 
+}
+
+void ANYGameModeStage::GameClear()
+{
+	// Server
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	SetSpawnersActive(false);
+
+	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
+	if (GS)
+	{
+		GS->ReplicatedClearedWaveCount = FMath::Max(0, CurrWave - 1);
+		GS->SetGamePhase(ENYGamePhase::GameClear);
+	}
+}
+
+void ANYGameModeStage::ReturnToMainMenu()
+{
+	// Server
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	GetWorld()->ServerTravel(MainMenuMapPath, false);
 }
 
 int32 ANYGameModeStage::CountPlayersWithPawn() const

@@ -13,7 +13,6 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputComponent;
-class UInputMappingContext;
 class UInputAction;
 class UNYWeaponComponent;
 
@@ -66,9 +65,6 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> DefaultMappingContext;
-
 	// Look
 	void Look(const FInputActionValue& Value);
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -99,6 +95,7 @@ protected:
 
 	UFUNCTION(Server, Reliable, Category = "Weapon")
 	void Server_SwapWeaponSlots();
+
 
 
 // Stat

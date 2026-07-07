@@ -85,6 +85,7 @@ protected:
 	void StartNextWave();
 	void TryStartFirstWave();
 	void GameOver();
+	void GameClear();
 
 	/** PlayerArray queries — single source of truth instead of manual ++/-- counters. */
 	int32 CountPlayersWithPawn() const;
@@ -113,6 +114,16 @@ public:
 
 protected:
 	int32 RetryVoteCount = 0;
+
+
+// GameClear
+public:
+	/** Server: travel all players back to the main menu map. */
+	void ReturnToMainMenu();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "GameClear")
+	FString MainMenuMapPath = TEXT("/Game/Levels/LV_MainMenu");
 
 
 // Spawner
