@@ -78,10 +78,15 @@ void UNYWeaponComponent::SetSecondaryWeaponDefinition(UNYWeaponDefinition* NewDe
 	NotifyWeaponSlotsChanged();
 }
 
+bool UNYWeaponComponent::CanSwapWeaponSlots() const
+{
+	return SecondarySlot.Definition != nullptr;
+}
+
 void UNYWeaponComponent::SwapWeaponSlots()
 {
 	// Server
-	if (!GetOwner() || !GetOwner()->HasAuthority())
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CanSwapWeaponSlots())
 	{
 		return;
 	}

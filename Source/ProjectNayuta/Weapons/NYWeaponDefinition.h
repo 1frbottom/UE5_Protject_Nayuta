@@ -8,6 +8,7 @@
 #include "NYWeaponDefinition.generated.h"
 
 class ANYAttackPlayerBase;
+class UTexture2D;
 
 /** Base weapon identity and class refs. Per-level tuning lives in DT_WeaponLevel. */
 UCLASS(BlueprintType)
@@ -19,6 +20,9 @@ class PROJECTNAYUTA_API UNYWeaponDefinition : public UDataAsset
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FText DisplayName;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	TObjectPtr<UTexture2D> Icon = nullptr;
 
 	/** Key into WeaponLevelDataTable rows (e.g. "Sword", "Axe"). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")

@@ -50,7 +50,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void SetSecondaryWeaponDefinition(UNYWeaponDefinition* NewDefinition);
 
-	/** Server: swap primary and secondary slot contents. */
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	bool CanSwapWeaponSlots() const;
+
+	/** Server: swap primary and secondary slot contents. No-op when secondary is empty. */
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void SwapWeaponSlots();
 

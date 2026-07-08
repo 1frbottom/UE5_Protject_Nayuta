@@ -244,6 +244,11 @@ void ANYCharacterPlayer::SwapWeaponSlots()
         return;
     }
 
+    if (!DefaultWeaponComp || !DefaultWeaponComp->CanSwapWeaponSlots())
+    {
+        return;
+    }
+
     if (HasAuthority())
     {
         if (DefaultWeaponComp)
