@@ -14,9 +14,11 @@
 ANYAttackMonsterRanged::ANYAttackMonsterRanged()
 {
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-	RootComponent = SphereComp;
+	SetRootComponent(SphereComp);
 	SphereComp->InitSphereRadius(15.0f);
 	SphereComp->SetCollisionProfileName(PROFILE_MONSTER_ATTACK);
+
+	StaticMeshComp->SetupAttachment(RootComponent);
 
 	ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
 	ProjectileMovementComp->InitialSpeed = 800.0f;
@@ -24,8 +26,6 @@ ANYAttackMonsterRanged::ANYAttackMonsterRanged()
 	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
 
 	InitialLifeSpan = 5.0f;
-
-
 }
 
 void ANYAttackMonsterRanged::BeginPlay()
