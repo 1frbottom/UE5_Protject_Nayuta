@@ -3,14 +3,19 @@
 #include "Weapons/PlayerWeapons/NYAttackPlayerAxe.h"
 
 #include "Components/BoxComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 ANYAttackPlayerAxe::ANYAttackPlayerAxe()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	BoxComp = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxComp"));
-	RootComponent = BoxComp;
-	BoxComp->SetBoxExtent(FVector(20.f, 50.f, 20.f));
+	SetRootComponent(BoxComp);
+	BoxComp->SetBoxExtent(FVector(50.f, 70.f, 20.f));
+
+	StaticMeshComp->SetupAttachment(RootComponent);
 
 	ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
 	ProjectileMovementComp->InitialSpeed = 1000.f;
@@ -18,6 +23,16 @@ ANYAttackPlayerAxe::ANYAttackPlayerAxe()
 	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
 
 	InitialLifeSpan = 1.0f;
+}
+
+void ANYAttackPlayerAxe::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (StaticMeshComp)
+	{
+		StaticMeshComp->AddLocalRotation(MeshSpinRate * DeltaTime);
+	}
 }
 
 void ANYAttackPlayerAxe::BeginPlay()
@@ -31,8 +46,6 @@ void ANYAttackPlayerAxe::BeginPlay()
 	}
 }
 
-
-// Attack
 void ANYAttackPlayerAxe::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	// Server

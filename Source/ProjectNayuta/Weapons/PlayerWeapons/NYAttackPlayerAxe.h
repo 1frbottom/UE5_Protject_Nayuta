@@ -17,6 +17,8 @@ class PROJECTNAYUTA_API ANYAttackPlayerAxe : public ANYAttackPlayerBase
 public:
 	ANYAttackPlayerAxe();
 
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -34,5 +36,9 @@ protected:
 protected:
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	/** Degrees/sec applied to StaticMeshComp only (root/collision stay flight-aligned). Tune axis to mesh pivot. */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack")
+	FRotator MeshSpinRate = FRotator(0.0f, 0.0f, 1080.0f);
 
 };

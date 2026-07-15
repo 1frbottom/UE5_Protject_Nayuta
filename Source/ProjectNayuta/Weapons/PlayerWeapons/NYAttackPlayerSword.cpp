@@ -5,18 +5,36 @@
 #include "ProjectNayuta.h"
 
 #include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 
-
-
 ANYAttackPlayerSword::ANYAttackPlayerSword()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-	RootComponent = SphereComp;
-	SphereComp->InitSphereRadius(100.f);
+	SetRootComponent(SphereComp);
+	// Radius applied from CurrentRange in BeginPlay (WeaponDefinition.AttackRange * level multiplier).
+	SphereComp->InitSphereRadius(1.f);
+
+	StaticMeshComp->SetupAttachment(RootComponent);
+}
+
+void ANYAttackPlayerSword::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (MeleeVisualDuration <= 0.0f)
+	{
+		return;
+	}
+
+	SwingElapsed += DeltaTime;
+	const float Alpha = FMath::Clamp(SwingElapsed / MeleeVisualDuration, 0.0f, 1.0f);
+	ApplyMeshSwingRotation(Alpha);
 }
 
 void ANYAttackPlayerSword::BeginPlay()
@@ -30,6 +48,13 @@ void ANYAttackPlayerSword::BeginPlay()
 
 	SphereComp->SetSphereRadius(CurrentRange);
 	SetLifeSpan(MeleeVisualDuration);
+
+	if (StaticMeshComp)
+	{
+		MeshBaseRelativeRotation = StaticMeshComp->GetRelativeRotation();
+		SwingElapsed = 0.0f;
+		ApplyMeshSwingRotation(0.0f);
+	}
 
 	// Server
 	if (HasAuthority())
@@ -112,4 +137,16 @@ void ANYAttackPlayerSword::ApplyMeleeDamageInRange()
 
 		UGameplayStatics::ApplyDamage(OtherActor, CurrentDamage, GetInstigatorController(), this, UDamageType::StaticClass());
 	}
+}
+
+void ANYAttackPlayerSword::ApplyMeshSwingRotation(float Alpha)
+{
+	if (!StaticMeshComp)
+	{
+		return;
+	}
+
+	const float HalfAngle = MeleeSweepAngle * 0.5f;
+	const float SwingYaw = FMath::Lerp(-HalfAngle, HalfAngle, Alpha) + MeshSwingYawOffset;
+	StaticMeshComp->SetRelativeRotation(MeshBaseRelativeRotation + FRotator(0.0f, SwingYaw, 0.0f));
 }
