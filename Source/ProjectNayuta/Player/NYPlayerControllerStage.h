@@ -63,7 +63,7 @@ protected:
     UPROPERTY(BlueprintReadWrite, Category = "UI")
     bool bIsPaused = false;
 
-    /** Client: single entry point for IMC, input mode, cursor, and pawn input. */
+    /** Client: gameplay IMC on/off, input mode, and cursor. */
     void ApplyInputConfig(ENYInputConfig Config);
 
 

@@ -3,8 +3,9 @@
 
 #include "Player/NYPlayerControllerStage.h"
 
-#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameFramework/PawnMovementComponent.h"
+
 #include "Blueprint/UserWidget.h"
 
 #include "Game/NYGameModeStage.h"
@@ -61,14 +62,15 @@ void ANYPlayerControllerStage::SetupInputComponent()
     Super::SetupInputComponent();
 }
 
-
-// UI
 void ANYPlayerControllerStage::ApplyInputConfig(ENYInputConfig Config)
 {
     if (!IsLocalPlayerController())
     {
         return;
     }
+
+    // Clear held keys before IMC swap so Sprint/etc. get a clean Completed.
+    FlushPressedKeys();
 
     UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 
@@ -83,40 +85,30 @@ void ANYPlayerControllerStage::ApplyInputConfig(ENYInputConfig Config)
         SetInputMode(FInputModeGameOnly());
         bShowMouseCursor = false;
         bIsPaused = false;
-
-        if (APawn* ControlledPawn = GetPawn())
-        {
-            ControlledPawn->EnableInput(this);
-        }
-
-        SetIgnoreMoveInput(false);
-        SetIgnoreLookInput(false);
         break;
 
     case ENYInputConfig::ModalUI:
-    {
-        FModifyContextOptions ContextOptions;
-        ContextOptions.bIgnoreAllPressedKeysUntilRelease = true;
-
         if (Subsystem && IMC_InGame)
         {
-            Subsystem->RemoveMappingContext(IMC_InGame, ContextOptions);
+            Subsystem->RemoveMappingContext(IMC_InGame);
         }
 
-        FInputModeGameAndUI InputMode;
-        InputMode.SetHideCursorDuringCapture(false);
-        SetInputMode(InputMode);
+        {
+            FInputModeGameAndUI InputMode;
+            InputMode.SetHideCursorDuringCapture(false);
+            SetInputMode(InputMode);
+        }
         bShowMouseCursor = true;
 
         if (APawn* ControlledPawn = GetPawn())
         {
-            ControlledPawn->DisableInput(this);
+            if (UPawnMovementComponent* MoveComp = ControlledPawn->GetMovementComponent())
+            {
+                MoveComp->StopMovementImmediately();
+            }
         }
-
-        SetIgnoreMoveInput(true);
-        SetIgnoreLookInput(true);
         break;
-    }
+
     default:
         break;
     }
@@ -189,8 +181,6 @@ void ANYPlayerControllerStage::TogglePause()
     }
 }
 
-
-// Reward
 void ANYPlayerControllerStage::ConfirmRewardSelection(int32 SlotIndex)
 {
     Server_SelectReward(SlotIndex);
@@ -215,8 +205,6 @@ void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeI
     }
 }
 
-
-// GameOver
 void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
 {
     ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
