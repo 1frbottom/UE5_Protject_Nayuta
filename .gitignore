@@ -3,7 +3,9 @@ Content/Developers/*
 Content/ThirdParty/*
 Content/Sound/*
 Content/Image/*
+Content/Fab/*
 Scripts/
+
 
 # Cursor
 .agents/
