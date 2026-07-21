@@ -14,6 +14,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputComponent;
 class UInputAction;
+class UStaticMeshComponent;
 class UNYWeaponComponent;
 
 UCLASS()
@@ -28,6 +29,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	virtual void PossessedBy(AController* NewController) override;
@@ -133,9 +135,24 @@ public:
 
 	void ResetWeaponForNewRun();
 
+	/** Ref-counted hide for thrown attacks; safe if multiple projectiles overlap. */
+	void PushHeldWeaponMeshHidden();
+	void PopHeldWeaponMeshHidden();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<UNYWeaponComponent> DefaultWeaponComp;
+
+	/** Held weapon visual; mesh comes from PrimarySlot Definition.WeaponMesh. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	TObjectPtr<UStaticMeshComponent> WeaponMeshComp;
+
+	UFUNCTION()
+	void UpdateWeaponVisual();
+
+	void RefreshHeldWeaponMeshVisibility();
+
+	int32 HeldWeaponMeshHideCount = 0;
 
 
 

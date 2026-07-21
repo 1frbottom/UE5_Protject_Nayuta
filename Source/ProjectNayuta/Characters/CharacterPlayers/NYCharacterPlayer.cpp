@@ -13,6 +13,7 @@
 #include "GameFramework/SpringArmComponent.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
 
 #include "Net/UnrealNetwork.h"      // DOREPLIFETIME
@@ -26,6 +27,7 @@
 #include "Player/NYPlayerStateStage.h"
 
 #include "Weapons/NYWeaponComponent.h"
+#include "Weapons/NYWeaponDefinition.h"
 
 
 
@@ -60,6 +62,10 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     // Weapon
     DefaultWeaponComp = CreateDefaultSubobject<UNYWeaponComponent>(TEXT("DefaultWeaponComp"));
 
+    WeaponMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMeshComp"));
+    WeaponMeshComp->SetupAttachment(GetMesh());
+    WeaponMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
     // Multiplay
     bReplicates = true;     // make this actor replicated by network
 
@@ -77,7 +83,13 @@ void ANYCharacterPlayer::Tick(float DeltaTime)
 void ANYCharacterPlayer::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (DefaultWeaponComp)
+	{
+		DefaultWeaponComp->OnWeaponSlotsChanged.AddDynamic(this, &ANYCharacterPlayer::UpdateWeaponVisual);
+		UpdateWeaponVisual();
+	}
+
     // core logic : should be started by server(host)
     if (HasAuthority())
     {
@@ -86,6 +98,16 @@ void ANYCharacterPlayer::BeginPlay()
 
     }
 
+}
+
+void ANYCharacterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (DefaultWeaponComp)
+	{
+		DefaultWeaponComp->OnWeaponSlotsChanged.RemoveDynamic(this, &ANYCharacterPlayer::UpdateWeaponVisual);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 // after possessed, server only
@@ -426,4 +448,37 @@ void ANYCharacterPlayer::ResetWeaponForNewRun()
     {
         DefaultWeaponComp->ResetWeaponLevel();
     }
+}
+
+void ANYCharacterPlayer::UpdateWeaponVisual()
+{
+	if (!WeaponMeshComp || !DefaultWeaponComp)
+	{
+		return;
+	}
+
+	const UNYWeaponDefinition* Definition = DefaultWeaponComp->GetPrimarySlot().Definition;
+	UStaticMesh* NewMesh = Definition ? Definition->WeaponMesh : nullptr;
+	WeaponMeshComp->SetStaticMesh(NewMesh);
+	RefreshHeldWeaponMeshVisibility();
+}
+
+void ANYCharacterPlayer::PushHeldWeaponMeshHidden()
+{
+	++HeldWeaponMeshHideCount;
+	RefreshHeldWeaponMeshVisibility();
+}
+
+void ANYCharacterPlayer::PopHeldWeaponMeshHidden()
+{
+	HeldWeaponMeshHideCount = FMath::Max(0, HeldWeaponMeshHideCount - 1);
+	RefreshHeldWeaponMeshVisibility();
+}
+
+void ANYCharacterPlayer::RefreshHeldWeaponMeshVisibility()
+{
+	if (WeaponMeshComp)
+	{
+		WeaponMeshComp->SetHiddenInGame(HeldWeaponMeshHideCount > 0);
+	}
 }

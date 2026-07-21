@@ -16,5 +16,11 @@ class PROJECTNAYUTA_API ANYAttackPlayerBase : public ANYAttackBase
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	void TryHideHeldWeaponMesh();
+	void TryRestoreHeldWeaponMesh();
+
+	bool bHidHeldWeaponMesh = false;
 
 };

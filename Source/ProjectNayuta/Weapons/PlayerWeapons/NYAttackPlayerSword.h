@@ -8,7 +8,7 @@
 
 class USphereComponent;
 
-/** Melee attack — overlaps monsters around the instigator; no projectile movement. */
+/** Melee attack — overlaps monsters around the instigator; held mesh stays on the character. */
 UCLASS()
 class PROJECTNAYUTA_API ANYAttackPlayerSword : public ANYAttackPlayerBase
 {
@@ -16,8 +16,6 @@ class PROJECTNAYUTA_API ANYAttackPlayerSword : public ANYAttackPlayerBase
 
 public:
 	ANYAttackPlayerSword();
-
-	virtual void Tick(float DeltaTime) override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -32,22 +30,13 @@ protected:
 // Attack
 protected:
 	void ApplyMeleeDamageInRange();
-	void ApplyMeshSwingRotation(float Alpha);
 
-	/** Brief lifetime for melee mesh swing. Slash Niagara belongs in BP (BeginPlay / Niagara component). */
+	/** Brief lifetime for slash VFX. Niagara belongs in BP (BeginPlay / Niagara component). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	float MeleeVisualDuration = 0.5f;
 
-	/** Sweep arc in degrees. 360 = full circle hit + full mesh spin. */
+	/** Sweep arc in degrees. 360 = full circle hit. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack", meta = (ClampMin = "10.0", ClampMax = "360.0"))
 	float MeleeSweepAngle = 360.0f;
-
-	/** Extra yaw applied on top of mesh relative rotation while swinging (degrees). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
-	float MeshSwingYawOffset = 0.0f;
-
-private:
-	FRotator MeshBaseRelativeRotation = FRotator::ZeroRotator;
-	float SwingElapsed = 0.0f;
 
 };

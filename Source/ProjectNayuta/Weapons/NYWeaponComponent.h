@@ -90,7 +90,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Weapon")
 	FNYOnWeaponLevelChanged OnWeaponLevelChanged;
 
-	// TODO : use for UI, VFX
+	/** Fires when primary/secondary slot contents change (equip, swap, level, reset, OnRep). */
 	UPROPERTY(BlueprintAssignable, Category = "Weapon")
 	FNYOnWeaponSlotsChanged OnWeaponSlotsChanged;
 

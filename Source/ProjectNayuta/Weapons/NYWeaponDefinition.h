@@ -8,6 +8,7 @@
 #include "NYWeaponDefinition.generated.h"
 
 class ANYAttackPlayerBase;
+class UStaticMesh;
 class UTexture2D;
 
 /** Base weapon identity and class refs. Per-level tuning lives in DT_WeaponLevel. */
@@ -24,6 +25,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
+	/** Held weapon visual on the character mesh. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	TObjectPtr<UStaticMesh> WeaponMesh = nullptr;
+
 	/** Key into WeaponLevelDataTable rows (e.g. "Sword", "Axe"). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FName WeaponID;
@@ -39,5 +44,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	float Cooldown = 1.0f;
+
+	/** When true, hide the character's held WeaponMeshComp for the attack actor's lifetime (e.g. thrown axe). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	bool bHideHeldMeshWhileAttacking = false;
 
 };

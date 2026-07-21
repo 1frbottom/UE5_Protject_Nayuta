@@ -13,28 +13,18 @@
 
 ANYAttackPlayerSword::ANYAttackPlayerSword()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	SetRootComponent(SphereComp);
 	// Radius applied from CurrentRange in BeginPlay (WeaponDefinition.AttackRange * level multiplier).
 	SphereComp->InitSphereRadius(1.f);
 
+	// Held sword lives on the character; this attack is collision + VFX only.
 	StaticMeshComp->SetupAttachment(RootComponent);
-}
-
-void ANYAttackPlayerSword::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	if (MeleeVisualDuration <= 0.0f)
-	{
-		return;
-	}
-
-	SwingElapsed += DeltaTime;
-	const float Alpha = FMath::Clamp(SwingElapsed / MeleeVisualDuration, 0.0f, 1.0f);
-	ApplyMeshSwingRotation(Alpha);
+	StaticMeshComp->SetHiddenInGame(true);
+	StaticMeshComp->SetVisibility(false);
+	StaticMeshComp->SetStaticMesh(nullptr);
 }
 
 void ANYAttackPlayerSword::BeginPlay()
@@ -51,9 +41,9 @@ void ANYAttackPlayerSword::BeginPlay()
 
 	if (StaticMeshComp)
 	{
-		MeshBaseRelativeRotation = StaticMeshComp->GetRelativeRotation();
-		SwingElapsed = 0.0f;
-		ApplyMeshSwingRotation(0.0f);
+		StaticMeshComp->SetStaticMesh(nullptr);
+		StaticMeshComp->SetHiddenInGame(true);
+		StaticMeshComp->SetVisibility(false);
 	}
 
 	// Server
@@ -137,16 +127,4 @@ void ANYAttackPlayerSword::ApplyMeleeDamageInRange()
 
 		UGameplayStatics::ApplyDamage(OtherActor, CurrentDamage, GetInstigatorController(), this, UDamageType::StaticClass());
 	}
-}
-
-void ANYAttackPlayerSword::ApplyMeshSwingRotation(float Alpha)
-{
-	if (!StaticMeshComp)
-	{
-		return;
-	}
-
-	const float HalfAngle = MeleeSweepAngle * 0.5f;
-	const float SwingYaw = FMath::Lerp(-HalfAngle, HalfAngle, Alpha) + MeshSwingYawOffset;
-	StaticMeshComp->SetRelativeRotation(MeshBaseRelativeRotation + FRotator(0.0f, SwingYaw, 0.0f));
 }
