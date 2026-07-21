@@ -15,6 +15,8 @@ skills-lock.json
 
 # C/C++
 compile_commands.json
+.clangd
+.editorconfig
 
 # Visual Studio Code (UE regenerates c_cpp_properties; custom tasks persist in tasks.json)
 .vscode/*
