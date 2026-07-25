@@ -258,6 +258,18 @@ void ANYPlayerStateStage::SetCurrHp(float InHp)
     OnRep_CurrHp();
 }
 
+void ANYPlayerStateStage::SetMaxHp(float InMaxHp)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    MaxHP = FMath::Max(1.0f, InMaxHp);
+    CurrHp = FMath::Clamp(CurrHp, 0.0f, MaxHP);
+    OnRep_CurrHp();
+}
+
 void ANYPlayerStateStage::ApplyDamage(float DamageAmount)
 {
     if (!HasAuthority() || !(CurrPhase == ENYPlayerPhase::Alive))

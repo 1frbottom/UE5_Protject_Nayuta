@@ -41,7 +41,7 @@ public:
 
 // PlayerController
 	UPROPERTY(Transient)
-	TObjectPtr<class ANYPlayerControllerStage> PC_ref;
+	TObjectPtr<class ANYPlayerControllerBase> PC_ref;
 
 
 // PlayerState

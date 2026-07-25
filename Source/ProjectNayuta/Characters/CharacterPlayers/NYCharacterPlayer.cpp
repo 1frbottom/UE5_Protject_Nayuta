@@ -23,7 +23,7 @@
 #include "Game/NYGameModeStage.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
-#include "Player/NYPlayerControllerStage.h"
+#include "Player/NYPlayerControllerBase.h"
 #include "Player/NYPlayerStateStage.h"
 
 #include "Weapons/NYWeaponComponent.h"
@@ -117,7 +117,7 @@ void ANYCharacterPlayer::PossessedBy(AController* NewController)
 
     InitPlayerState();
 
-    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
+    PC_ref = Cast<ANYPlayerControllerBase>(GetController());
 
 }
 
@@ -128,7 +128,7 @@ void ANYCharacterPlayer::PawnClientRestart()
 
     InitPlayerState();
 
-    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
+    PC_ref = Cast<ANYPlayerControllerBase>(GetController());
 }
 
 void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

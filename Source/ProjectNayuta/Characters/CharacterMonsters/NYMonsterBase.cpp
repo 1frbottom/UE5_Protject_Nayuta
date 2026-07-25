@@ -11,6 +11,7 @@
 #include "Net/UnrealNetwork.h"
 
 #include "Game/NYGameModeStage.h"
+#include "Game/NYGameModeTraining.h"
 #include "Game/NYMonsterPoolComponent.h"
 
 
@@ -50,6 +51,11 @@ ANYMonsterBase::ANYMonsterBase()
 void ANYMonsterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (CurrentHp <= 0.0f)
+	{
+		return;
+	}
 
     // Simple seek movement without navmesh.
     if (ActivationData.Target != nullptr)
@@ -106,9 +112,25 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
             else
                 Destroy();
         }
+        else if (ANYGameModeTraining* TrainingGM = Cast<ANYGameModeTraining>(GetWorld()->GetAuthGameMode()))
+        {
+            TrainingGM->NotifyTrainingMonsterDefeated(this);
+        }
     }
 
     return DamageAmount;
+}
+
+void ANYMonsterBase::SetMaxHpOnServer(float NewMaxHp)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    MaxHp = FMath::Max(1.0f, NewMaxHp);
+    CurrentHp = MaxHp;
+    OnRep_CurrentHp();
 }
 
 void ANYMonsterBase::OnRep_CurrentHp()
@@ -124,47 +146,75 @@ void ANYMonsterBase::OnRep_CurrentHp()
 // Multiplay
 void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
 {
-    if (HasAuthority())
+    if (!HasAuthority())
     {
-        CurrentHp = MaxHp;
-
-        SetActorLocation(StartLocation);
-        SetNetDormancy(DORM_Awake);
-
-        FMonsterActivationData NewData;
-        NewData.Target = NewTarget;
-        NewData.SpawnLocation = StartLocation;
-        ActivationData = NewData;
-
-        OnRep_ActivationData();
+        return;
     }
+
+    CurrentHp = MaxHp;
+
+    SetActorLocation(StartLocation);
+    SetNetDormancy(DORM_Awake);
+
+    FMonsterActivationData NewData;
+    NewData.bIsActive = true;
+    NewData.Target = NewTarget;
+    NewData.SpawnLocation = StartLocation;
+    ActivationData = NewData;
+
+    OnRep_ActivationData();
+}
+
+void ANYMonsterBase::ActivateIdleOnServer(FVector StartLocation)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    CurrentHp = MaxHp;
+
+    SetActorLocation(StartLocation);
+    SetNetDormancy(DORM_Awake);
+
+    FMonsterActivationData NewData;
+    NewData.bIsActive = true;
+    NewData.Target = nullptr;
+    NewData.SpawnLocation = StartLocation;
+    ActivationData = NewData;
+
+    OnRep_ActivationData();
 }
 
 void ANYMonsterBase::DeactivateOnServer()
 {
-    if (HasAuthority())
+    if (!HasAuthority())
     {
-        SetNetDormancy(DORM_DormantAll);
-
-        FMonsterActivationData NewData;
-        NewData.Target = nullptr;
-        NewData.SpawnLocation = FVector::ZeroVector;
-        ActivationData = NewData;
-
-        OnRep_ActivationData();
+        return;
     }
+
+    SetNetDormancy(DORM_DormantAll);
+
+    FMonsterActivationData NewData;
+    NewData.bIsActive = false;
+    NewData.Target = nullptr;
+    NewData.SpawnLocation = FVector::ZeroVector;
+    ActivationData = NewData;
+
+    OnRep_ActivationData();
 }
 
 void ANYMonsterBase::OnRep_ActivationData()
 {
-    if (ActivationData.Target != nullptr)
+    if (ActivationData.bIsActive)
     {
         // Apply authoritative spawn position on clients (movement is not replicated).
         SetActorLocation(ActivationData.SpawnLocation);
 
         SetActorHiddenInGame(false);
         SetActorEnableCollision(true);
-        SetActorTickEnabled(true);
+        // Tick only when chasing; idle stays visible without seek.
+        SetActorTickEnabled(ActivationData.Target != nullptr);
 
         RandomizedMoveSpeed = MoveSpeed * FMath::RandRange(0.8f, 1.2f);
         OnRep_CurrentHp();

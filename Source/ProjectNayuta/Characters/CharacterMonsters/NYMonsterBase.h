@@ -19,11 +19,15 @@ struct FMonsterActivationData
 {
     GENERATED_BODY()
 
+    /** When true, monster is visible/collidable. Target may still be null (idle). */
+    UPROPERTY()
+    bool bIsActive = false;
+
     UPROPERTY()
     TObjectPtr<AActor> Target;
 
     UPROPERTY()
-    FVector SpawnLocation;
+    FVector SpawnLocation = FVector::ZeroVector;
 };
 
 UCLASS()
@@ -60,8 +64,13 @@ protected:
 // Stat
 public:
     FORCEINLINE FName GetRewardRowID() const { return RewardRowID; }
+    FORCEINLINE float GetMaxHp() const { return MaxHp; }
+    FORCEINLINE float GetCurrentHp() const { return CurrentHp; }
 
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+
+    /** Authority-only: set MaxHp and refill CurrentHp. */
+    void SetMaxHpOnServer(float NewMaxHp);
 
 protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
@@ -86,8 +95,12 @@ protected:
 
 // Multiplay
 public:
-    /** Authority-only: pull from pool and replicate activation to clients. */
+    /** Authority-only: show at location and chase NewTarget (pooled combat spawn). */
     void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
+
+    /** Authority-only: show at location with no chase target (training idle). */
+    void ActivateIdleOnServer(FVector StartLocation);
+
     void DeactivateOnServer();
 
 protected:

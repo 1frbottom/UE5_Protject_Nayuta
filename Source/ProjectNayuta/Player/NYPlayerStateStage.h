@@ -100,6 +100,9 @@ public:
 
 	void SetCurrHp(float InHp);
 
+	/** Server: set MaxHP and clamp CurrHp. */
+	void SetMaxHp(float InMaxHp);
+
 	//FORCEINLINE bool GetIsDead() const { return bIsDead; }
 	//void SetbIsDead(bool InIsDead);
 
