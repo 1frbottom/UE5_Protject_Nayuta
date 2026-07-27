@@ -5,6 +5,7 @@
 
 #include "ProjectNayuta.h"
 
+#include "Animation/AnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -90,7 +91,7 @@ void ANYMonsterBase::BeginPlay()
 	Super::BeginPlay();
 	
     CurrentHp = MaxHp;
-
+    LastObservedHp = CurrentHp;
 
 }
 
@@ -134,6 +135,16 @@ void ANYMonsterBase::OnRep_CurrentHp()
     
     if (SphereComp)
         SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
+
+    // Only a drop is a hit; a rise means the pool refilled this monster.
+    // Hits landed between two net updates arrive coalesced into a single reaction.
+    const float DamageTaken = LastObservedHp - CurrentHp;
+    LastObservedHp = CurrentHp;
+
+    if (DamageTaken > 0.0f && CurrentHp > 0.0f && GetNetMode() != NM_DedicatedServer)
+    {
+        OnHitReaction(DamageTaken);
+    }
 
     // Runs on server and clients: a corpse keeps rendering but stops colliding and seeking.
     if (CurrentHp <= 0.0f && ActivationData.bIsActive)
@@ -287,6 +298,12 @@ void ANYMonsterBase::OnRep_ActivationData()
     }
     else
     {
+        // Pooled reuse: a hit reaction left mid-blend would resume on the next activation.
+        if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.0f);
+        }
+
         SetActorHiddenInGame(true);
         SetActorEnableCollision(false);
         SetActorTickEnabled(false);

@@ -138,4 +138,19 @@ protected:
     UFUNCTION()
     virtual void OnRep_ActivationData();
 
+
+// Feedback
+protected:
+    /**
+     * Local hit reaction (montage, SFX, flash) authored in Blueprint.
+     * Fires on every machine that renders this monster, never on a dedicated server,
+     * and is skipped for the lethal hit so the death animation owns that moment.
+     */
+    UFUNCTION(BlueprintImplementableEvent, Category = "Feedback")
+    void OnHitReaction(float DamageTaken);
+
+private:
+    /** Locally cached HP so OnRep_CurrentHp can tell a hit apart from a pool refill. */
+    float LastObservedHp = 0.0f;
+
 };
