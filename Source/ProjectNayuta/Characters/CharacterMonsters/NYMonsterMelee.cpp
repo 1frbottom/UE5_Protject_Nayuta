@@ -40,6 +40,11 @@ void ANYMonsterMelee::OnRep_ActivationData()
 
 
 // Attack
+void ANYMonsterMelee::StopAttackOnServer()
+{
+	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+}
+
 void ANYMonsterMelee::ProcessMeleeAttack()
 {
 	if (ActivationData.Target == nullptr)

@@ -42,6 +42,11 @@ void ANYMonsterRanged::OnRep_ActivationData()
 
 
 // Attack
+void ANYMonsterRanged::StopAttackOnServer()
+{
+	GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
+}
+
 void ANYMonsterRanged::CheckAndFire()
 {
 	if (!ActivationData.Target)

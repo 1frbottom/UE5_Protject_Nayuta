@@ -55,7 +55,7 @@ ANYMonsterBase* UNYMonsterPoolComponent::GetMonster(FVector SpawnLocation, FRota
 
 void UNYMonsterPoolComponent::ReturnMonster(ANYMonsterBase* Monster)
 {
-	if (!Monster)
+	if (!Monster || !Monster->IsActive())
 	{
 		return;
 	}

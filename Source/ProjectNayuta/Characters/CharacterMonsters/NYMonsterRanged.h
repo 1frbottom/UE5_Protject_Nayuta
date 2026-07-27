@@ -26,6 +26,8 @@ protected:
 
 // Attack
 protected:
+	virtual void StopAttackOnServer() override;
+
 	/* Must be designated in BP_MonsterRanged */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	TSubclassOf<ANYAttackMonsterRanged> ProjectileClass;

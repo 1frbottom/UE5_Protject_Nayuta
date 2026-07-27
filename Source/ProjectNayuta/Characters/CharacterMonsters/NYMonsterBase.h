@@ -83,7 +83,7 @@ protected:
     float MaxHp = 100.0f;
 
     UPROPERTY(ReplicatedUsing = OnRep_CurrentHp, EditAnywhere, Category = "Stat")
-    float CurrentHp;
+    float CurrentHp = 100.0f;
 
     /** Row name in MonsterRewardDataTable (GameMode). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat")
@@ -93,15 +93,43 @@ protected:
     void OnRep_CurrentHp();
 
 
+// Death
+public:
+    FORCEINLINE bool IsDying() const { return bIsDying; }
+
+protected:
+    /** Authority-only: grant rewards, stop acting, and return to the pool after the death animation. */
+    void StartDeathOnServer(AController* KillerController);
+
+    /** Authority-only: hand the corpse back to the pool (or destroy it when no pool exists). */
+    void FinishDeathOnServer();
+
+    /** Authority-only: stop attack timers. Overridden by monsters that own one. */
+    virtual void StopAttackOnServer() {}
+
+    /** Seconds the corpse stays visible so every machine can play the death animation. */
+    UPROPERTY(EditAnywhere, Category = "Death")
+    float DeathDuration = 2.0f;
+
+    /** Server-only. Clients infer the corpse state from replicated CurrentHp. */
+    UPROPERTY(Transient)
+    bool bIsDying = false;
+
+private:
+    FTimerHandle DeathTimerHandle;
+
+
 // Multiplay
 public:
+    FORCEINLINE bool IsActive() const { return ActivationData.bIsActive; }
+
     /** Authority-only: show at location and chase NewTarget (pooled combat spawn). */
     void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
 
     /** Authority-only: show at location with no chase target (training idle). */
     void ActivateIdleOnServer(FVector StartLocation);
 
-    void DeactivateOnServer();
+    void DeactivateOnServer();  
 
 protected:
     UPROPERTY(ReplicatedUsing = OnRep_ActivationData, Transient)

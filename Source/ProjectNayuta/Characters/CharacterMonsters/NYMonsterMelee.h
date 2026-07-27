@@ -24,6 +24,8 @@ protected:
 
 // Attack
 protected:
+	virtual void StopAttackOnServer() override;
+
 	UPROPERTY(EditAnywhere, Category = "Attack")
 	float AttackDamage = 10.0f;
 

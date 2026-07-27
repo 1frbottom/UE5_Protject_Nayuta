@@ -40,6 +40,9 @@ ANYMonsterBase::ANYMonsterBase()
     SkeletalMeshComp->SetupAttachment(RootComponent);
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    // Horde scale: offscreen monsters skip pose evaluation entirely.
+    SkeletalMeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+
     // Debug HP visualization (replace with proper UI later).
     SphereComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HpSphereComp"));
     SphereComp->SetupAttachment(RootComponent);
@@ -98,24 +101,16 @@ float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
     if (!HasAuthority())
         return 0.0f;
 
+    // Corpses are still visible during the death animation, so reject damage that would kill twice.
+    if (bIsDying)
+        return 0.0f;
+
     CurrentHp -= DamageAmount;
     OnRep_CurrentHp();
 
     if (CurrentHp <= 0.0f)
     {
-        if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
-        {
-            GM->OnEnemyKilled(EventInstigator, this);
-
-            if (GM->GetMonsterPoolComponent())
-                GM->GetMonsterPoolComponent()->ReturnMonster(this);
-            else
-                Destroy();
-        }
-        else if (ANYGameModeTraining* TrainingGM = Cast<ANYGameModeTraining>(GetWorld()->GetAuthGameMode()))
-        {
-            TrainingGM->NotifyTrainingMonsterDefeated(this);
-        }
+        StartDeathOnServer(EventInstigator);
     }
 
     return DamageAmount;
@@ -140,6 +135,73 @@ void ANYMonsterBase::OnRep_CurrentHp()
     if (SphereComp)
         SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
 
+    // Runs on server and clients: a corpse keeps rendering but stops colliding and seeking.
+    if (CurrentHp <= 0.0f && ActivationData.bIsActive)
+    {
+        SetActorEnableCollision(false);
+        SetActorTickEnabled(false);
+    }
+}
+
+
+// Death
+void ANYMonsterBase::StartDeathOnServer(AController* KillerController)
+{
+    if (!HasAuthority() || bIsDying)
+    {
+        return;
+    }
+
+    bIsDying = true;
+    StopAttackOnServer();
+
+    // Kill count and rewards are granted immediately; only the cleanup waits for the animation.
+    if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
+    {
+        GM->OnEnemyKilled(KillerController, this);
+    }
+
+    // OnEnemyKilled can end the wave, which already returned every monster to the pool.
+    if (!ActivationData.bIsActive)
+    {
+        bIsDying = false;
+        return;
+    }
+
+    if (DeathDuration <= 0.0f)
+    {
+        FinishDeathOnServer();
+        return;
+    }
+
+    GetWorldTimerManager().SetTimer(DeathTimerHandle, this, &ANYMonsterBase::FinishDeathOnServer, DeathDuration, false);
+}
+
+void ANYMonsterBase::FinishDeathOnServer()
+{
+    if (!HasAuthority() || !bIsDying)
+    {
+        return;
+    }
+
+    bIsDying = false;
+
+    if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
+    {
+        if (UNYMonsterPoolComponent* Pool = GM->GetMonsterPoolComponent())
+        {
+            Pool->ReturnMonster(this);
+            return;
+        }
+    }
+    else if (ANYGameModeTraining* TrainingGM = Cast<ANYGameModeTraining>(GetWorld()->GetAuthGameMode()))
+    {
+        // Training reuses the same actor: the reset re-activates it and refills HP.
+        TrainingGM->NotifyTrainingMonsterDefeated(this);
+        return;
+    }
+
+    Destroy();
 }
 
 
@@ -192,6 +254,10 @@ void ANYMonsterBase::DeactivateOnServer()
     {
         return;
     }
+
+    // A wave can end mid-death; drop the pending return so the monster is not pooled twice.
+    GetWorldTimerManager().ClearTimer(DeathTimerHandle);
+    bIsDying = false;
 
     SetNetDormancy(DORM_DormantAll);
 
