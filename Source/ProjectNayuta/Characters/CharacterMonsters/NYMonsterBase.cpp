@@ -17,6 +17,12 @@
 
 
 
+namespace
+{
+    /** Knockback below this speed (cm/s) is snapped to zero so the tick can go back to sleep. */
+    constexpr float KnockbackRestSpeed = 5.0f;
+}
+
 ANYMonsterBase::ANYMonsterBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -61,21 +67,34 @@ void ANYMonsterBase::Tick(float DeltaTime)
 		return;
 	}
 
-    // Simple seek movement without navmesh.
-    if (ActivationData.Target != nullptr)
+    const bool bKnockbackActive = UpdateKnockback(DeltaTime);
+
+    // Idle monsters keep their tick off; a hit turns it back on just long enough to slide.
+    if (ActivationData.Target == nullptr)
     {
-        FVector Direction = (ActivationData.Target->GetActorLocation() - GetActorLocation()).GetSafeNormal();
-
-        // Small random offset to reduce stacking.
-        Direction.X += FMath::RandRange(-0.1f, 0.1f);
-        Direction.Y += FMath::RandRange(-0.1f, 0.1f);
-        Direction.Normalize();
-
-        AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, true);
-
-        FRotator TargetRotation = Direction.Rotation();
-        SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
+        if (!bKnockbackActive)
+        {
+            SetActorTickEnabled(false);
+        }
+        return;
     }
+
+    if (IsStaggered())
+    {
+        return;
+    }
+
+    // Simple seek movement without navmesh.
+    FVector Direction = (ActivationData.Target->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+
+    // Constant per-monster lean off the straight line, so the horde spreads instead of
+    // funnelling into one point. Derived from the replicated seed, unlike a per-frame draw.
+    Direction = Direction.RotateAngleAxis(ApproachAngleOffset, FVector::UpVector);
+
+    AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, true);
+
+    FRotator TargetRotation = Direction.Rotation();
+    SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
 }
 
 void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -141,9 +160,18 @@ void ANYMonsterBase::OnRep_CurrentHp()
     const float DamageTaken = LastObservedHp - CurrentHp;
     LastObservedHp = CurrentHp;
 
-    if (DamageTaken > 0.0f && CurrentHp > 0.0f && GetNetMode() != NM_DedicatedServer)
+    // The lethal hit belongs to the death animation, not to a stagger.
+    if (DamageTaken > 0.0f && CurrentHp > 0.0f)
     {
-        OnHitReaction(DamageTaken);
+        // Gameplay runs everywhere, including a dedicated server, so the authoritative
+        // position stays in step with what players are looking at.
+        BeginStagger();
+        BeginKnockback();
+
+        if (GetNetMode() != NM_DedicatedServer)
+        {
+            OnHitFeedback(DamageTaken);
+        }
     }
 
     // Runs on server and clients: a corpse keeps rendering but stops colliding and seeking.
@@ -233,6 +261,7 @@ void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
     NewData.bIsActive = true;
     NewData.Target = NewTarget;
     NewData.SpawnLocation = StartLocation;
+    NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
     ActivationData = NewData;
 
     OnRep_ActivationData();
@@ -254,6 +283,7 @@ void ANYMonsterBase::ActivateIdleOnServer(FVector StartLocation)
     NewData.bIsActive = true;
     NewData.Target = nullptr;
     NewData.SpawnLocation = StartLocation;
+    NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
     ActivationData = NewData;
 
     OnRep_ActivationData();
@@ -293,19 +323,89 @@ void ANYMonsterBase::OnRep_ActivationData()
         // Tick only when chasing; idle stays visible without seek.
         SetActorTickEnabled(ActivationData.Target != nullptr);
 
-        RandomizedMoveSpeed = MoveSpeed * FMath::RandRange(0.8f, 1.2f);
+        ClearHitState();
+
+        // Both values come from the replicated seed, so every machine walks this monster
+        // the same way. The golden ratio keeps the angle from tracking the speed.
+        const float SpeedAlpha = ActivationData.MoveSeed / 255.0f;
+        const float AngleAlpha = FMath::Frac(ActivationData.MoveSeed * 0.6180339887f);
+
+        RandomizedMoveSpeed = MoveSpeed * FMath::Lerp(0.8f, 1.2f, SpeedAlpha);
+        ApproachAngleOffset = FMath::Lerp(-MaxApproachAngleOffset, MaxApproachAngleOffset, AngleAlpha);
+
         OnRep_CurrentHp();
     }
     else
     {
-        // Pooled reuse: a hit reaction left mid-blend would resume on the next activation.
+        // Pooled reuse: a hit montage left mid-blend would resume on the next activation.
         if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
         {
             AnimInstance->StopAllMontages(0.0f);
         }
 
+        ClearHitState();
+
         SetActorHiddenInGame(true);
         SetActorEnableCollision(false);
         SetActorTickEnabled(false);
     }
+}
+
+
+// Hit Reaction
+bool ANYMonsterBase::IsStaggered() const
+{
+    const UWorld* World = GetWorld();
+    return World && World->GetTimeSeconds() < StaggerEndTime;
+}
+
+void ANYMonsterBase::BeginStagger()
+{
+    if (const UWorld* World = GetWorld())
+    {
+        StaggerEndTime = World->GetTimeSeconds() + StaggerDuration;
+    }
+}
+
+void ANYMonsterBase::BeginKnockback()
+{
+    // The attacker is not replicated, but the chase target is. In a top-down horde the
+    // player being chased is almost always the one landing the hit, so push away from them.
+    const AActor* Target = ActivationData.Target;
+    if (!Target)
+    {
+        return;
+    }
+
+    const FVector Away = (GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D();
+    KnockbackVelocity = Away * KnockbackSpeed;
+
+    // An idle monster has its tick off; the slide needs it back for a moment.
+    SetActorTickEnabled(true);
+}
+
+bool ANYMonsterBase::UpdateKnockback(float DeltaTime)
+{
+    if (KnockbackVelocity.IsNearlyZero())
+    {
+        return false;
+    }
+
+    AddActorWorldOffset(KnockbackVelocity * DeltaTime, true);
+    KnockbackVelocity = FMath::VInterpTo(KnockbackVelocity, FVector::ZeroVector, DeltaTime, KnockbackDamping);
+
+    // Stop chasing an ever-smaller remainder.
+    if (KnockbackVelocity.SizeSquared() < FMath::Square(KnockbackRestSpeed))
+    {
+        KnockbackVelocity = FVector::ZeroVector;
+        return false;
+    }
+
+    return true;
+}
+
+void ANYMonsterBase::ClearHitState()
+{
+    StaggerEndTime = 0.0f;
+    KnockbackVelocity = FVector::ZeroVector;
 }

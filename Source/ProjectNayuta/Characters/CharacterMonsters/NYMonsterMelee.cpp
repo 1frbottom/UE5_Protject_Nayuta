@@ -50,6 +50,10 @@ void ANYMonsterMelee::ProcessMeleeAttack()
 	if (ActivationData.Target == nullptr)
 		return;
 
+	// Being hit interrupts the swing; the timer keeps running and retries next interval.
+	if (IsStaggered())
+		return;
+
 	float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
 
 	float AttackRangeSq = FMath::Square(100.0f);

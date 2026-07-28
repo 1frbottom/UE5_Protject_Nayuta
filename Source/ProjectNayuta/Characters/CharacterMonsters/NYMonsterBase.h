@@ -28,6 +28,13 @@ struct FMonsterActivationData
 
     UPROPERTY()
     FVector SpawnLocation = FVector::ZeroVector;
+
+    /**
+     * Rolled once on the server and replicated so every machine derives the same move speed
+     * and approach angle. Drawing those locally would let the simulations drift apart.
+     */
+    UPROPERTY()
+    uint8 MoveSeed = 0;
 };
 
 UCLASS()
@@ -76,8 +83,16 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
     float MoveSpeed = 200.0f;
 
+    /** Widest angle (degrees) a monster may lean off the straight line to its target. */
+    UPROPERTY(EditAnywhere, Category = "Stat")
+    float MaxApproachAngleOffset = 20.0f;
+
     UPROPERTY()
     float RandomizedMoveSpeed;
+
+    /** Derived from ActivationData.MoveSeed; spreads the horde without desyncing machines. */
+    UPROPERTY()
+    float ApproachAngleOffset = 0.0f;
 
     UPROPERTY(EditAnywhere, Category = "Stat")
     float MaxHp = 100.0f;
@@ -139,17 +154,53 @@ protected:
     virtual void OnRep_ActivationData();
 
 
-// Feedback
+// Hit Reaction
+public:
+    /** True while a recent hit is suppressing this monster's seek and attacks. */
+    bool IsStaggered() const;
+
 protected:
     /**
-     * Local hit reaction (montage, SFX, flash) authored in Blueprint.
+     * Presentation only (montage, SFX, flash), authored in Blueprint.
      * Fires on every machine that renders this monster, never on a dedicated server,
      * and is skipped for the lethal hit so the death animation owns that moment.
      */
-    UFUNCTION(BlueprintImplementableEvent, Category = "Feedback")
-    void OnHitReaction(float DamageTaken);
+    UFUNCTION(BlueprintImplementableEvent, Category = "Hit Reaction")
+    void OnHitFeedback(float DamageTaken);
+
+    /** Seconds the monster stops seeking and attacking after taking damage. */
+    UPROPERTY(EditAnywhere, Category = "Hit Reaction")
+    float StaggerDuration = 0.15f;
+
+    /** Initial push speed away from the chase target, in cm/s. Zero disables knockback. */
+    UPROPERTY(EditAnywhere, Category = "Hit Reaction")
+    float KnockbackSpeed = 400.0f;
+
+    /** Higher values bleed the knockback off faster. */
+    UPROPERTY(EditAnywhere, Category = "Hit Reaction")
+    float KnockbackDamping = 8.0f;
 
 private:
+    /**
+     * Suppresses seek and attacks for StaggerDuration. Together with BeginKnockback() this is
+     * the gameplay half of a hit: both are driven by replicated HP so server and clients start
+     * them together, keeping the authoritative position close to what players see.
+     */
+    void BeginStagger();
+
+    /** Pushes the monster away from its chase target. No-op without a target. */
+    void BeginKnockback();
+
+    /** Advances the knockback slide. Returns true while it is still moving the monster. */
+    bool UpdateKnockback(float DeltaTime);
+
+    /** Clears stagger and knockback so a pooled monster never inherits the previous life's state. */
+    void ClearHitState();
+
+    float StaggerEndTime = 0.0f;
+
+    FVector KnockbackVelocity = FVector::ZeroVector;
+
     /** Locally cached HP so OnRep_CurrentHp can tell a hit apart from a pool refill. */
     float LastObservedHp = 0.0f;
 
