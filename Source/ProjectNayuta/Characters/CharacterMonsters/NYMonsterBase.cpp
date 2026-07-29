@@ -150,10 +150,10 @@ void ANYMonsterBase::SetMaxHpOnServer(float NewMaxHp)
 
 void ANYMonsterBase::OnRep_CurrentHp()
 {
-    float HpRatio = FMath::Max(0.3f, CurrentHp / MaxHp);
-    
-    if (SphereComp)
-        SphereComp->SetCustomPrimitiveDataFloat(0, HpRatio);
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        OnHpChanged(CurrentHp, MaxHp);
+    }
 
     // Only a drop is a hit; a rise means the pool refilled this monster.
     // Hits landed between two net updates arrive coalesced into a single reaction.
@@ -177,6 +177,11 @@ void ANYMonsterBase::OnRep_CurrentHp()
     // Runs on server and clients: a corpse keeps rendering but stops colliding and seeking.
     if (CurrentHp <= 0.0f && ActivationData.bIsActive)
     {
+        if (GetNetMode() != NM_DedicatedServer)
+        {
+            OnDeathFeedback();
+        }
+
         SetActorEnableCollision(false);
         SetActorTickEnabled(false);
     }

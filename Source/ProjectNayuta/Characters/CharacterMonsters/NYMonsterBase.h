@@ -104,6 +104,13 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat")
     FName RewardRowID = TEXT("Default");
 
+    /**
+     * Presentation hook for HP visuals (e.g. prototype SphereComp CPD).
+     * Fires on every CurrentHp replication, never on a dedicated server.
+     */
+    UFUNCTION(BlueprintImplementableEvent, Category = "Stat")
+    void OnHpChanged(float NewCurrentHp, float NewMaxHp);
+
     UFUNCTION()
     void OnRep_CurrentHp();
 
@@ -121,6 +128,9 @@ protected:
 
     /** Authority-only: stop attack timers. Overridden by monsters that own one. */
     virtual void StopAttackOnServer() {}
+
+    UFUNCTION(BlueprintImplementableEvent, Category = "Death")
+    void OnDeathFeedback();
 
     /** Seconds the corpse stays visible so every machine can play the death animation. */
     UPROPERTY(EditAnywhere, Category = "Death")
@@ -165,19 +175,19 @@ protected:
      * Fires on every machine that renders this monster, never on a dedicated server,
      * and is skipped for the lethal hit so the death animation owns that moment.
      */
-    UFUNCTION(BlueprintImplementableEvent, Category = "Hit Reaction")
+    UFUNCTION(BlueprintImplementableEvent, Category = "Hit")
     void OnHitFeedback(float DamageTaken);
 
     /** Seconds the monster stops seeking and attacking after taking damage. */
-    UPROPERTY(EditAnywhere, Category = "Hit Reaction")
+    UPROPERTY(EditAnywhere, Category = "Hit")
     float StaggerDuration = 0.15f;
 
     /** Initial push speed away from the chase target, in cm/s. Zero disables knockback. */
-    UPROPERTY(EditAnywhere, Category = "Hit Reaction")
+    UPROPERTY(EditAnywhere, Category = "Hit")
     float KnockbackSpeed = 400.0f;
 
     /** Higher values bleed the knockback off faster. */
-    UPROPERTY(EditAnywhere, Category = "Hit Reaction")
+    UPROPERTY(EditAnywhere, Category = "Hit")
     float KnockbackDamping = 8.0f;
 
 private:
