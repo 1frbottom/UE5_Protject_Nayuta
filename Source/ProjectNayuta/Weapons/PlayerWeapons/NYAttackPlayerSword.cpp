@@ -11,6 +11,8 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 
+
+
 ANYAttackPlayerSword::ANYAttackPlayerSword()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -52,7 +54,6 @@ void ANYAttackPlayerSword::BeginPlay()
 		ApplyMeleeDamageInRange();
 	}
 }
-
 
 // Attack
 void ANYAttackPlayerSword::ApplyMeleeDamageInRange()

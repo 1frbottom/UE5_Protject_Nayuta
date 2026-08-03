@@ -22,10 +22,16 @@ ANYAttackMonsterRanged::ANYAttackMonsterRanged()
 
 	ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
 	ProjectileMovementComp->InitialSpeed = 800.0f;
-	ProjectileMovementComp->MaxSpeed = 800.0f;
-	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
+	// Unlimited: SetLaunchVelocity supplies the actual speed, and a lobbed arc can exceed this otherwise.
+	ProjectileMovementComp->MaxSpeed = 0.0f;
+	ProjectileMovementComp->ProjectileGravityScale = 1.0f;
 
 	InitialLifeSpan = 5.0f;
+}
+
+void ANYAttackMonsterRanged::SetLaunchVelocity(const FVector& InVelocity)
+{
+	ProjectileMovementComp->Velocity = InVelocity;
 }
 
 void ANYAttackMonsterRanged::BeginPlay()

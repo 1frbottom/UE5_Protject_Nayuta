@@ -10,10 +10,11 @@
 
 ANYMonsterRanged::ANYMonsterRanged()
 {
-	LastFireTime = 0.0f;
 	RewardRowID = TEXT("Ranged");
 
-	AttackRangeSqrd = FMath::Square(AttackRange);
+	AttackDamage = 15.0f;
+	AttackRange = 500.0f;
+	AttackInterval = 2.0f;
 }
 
 void ANYMonsterRanged::BeginPlay()
@@ -23,45 +24,11 @@ void ANYMonsterRanged::BeginPlay()
 
 }
 
-void ANYMonsterRanged::OnRep_ActivationData()
-{
-	Super::OnRep_ActivationData();
-
-	if (ActivationData.Target != nullptr)
-	{
-		if (HasAuthority())
-		{
-			GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
-		}
-	}
-	else
-	{
-		GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
-	}
-}
-
-
 // Attack
-void ANYMonsterRanged::StopAttackOnServer()
+void ANYMonsterRanged::PerformAttack()
 {
-	GetWorldTimerManager().ClearTimer(FireCheckTimerHandle);
-}
-
-void ANYMonsterRanged::CheckAndFire()
-{
-	if (!ActivationData.Target)
-		return;
-
-	float CurrentTime = GetWorld()->GetTimeSeconds();
-	if (CurrentTime - LastFireTime < FireRate)
-		return;
-
-	float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
-	if (DistSq <= AttackRangeSqrd)
-	{
-		FireProjectile();
-		LastFireTime = CurrentTime;
-	}
+	// Server-only: base's ProcessAttack only calls this after CanAttack() (target, stagger, range).
+	FireProjectile();
 }
 
 void ANYMonsterRanged::FireProjectile()
@@ -81,5 +48,12 @@ void ANYMonsterRanged::FireProjectile()
 	if (Projectile)
 	{
 		Projectile->InitAttackStat(AttackDamage, AttackRange);
+
+		FVector LaunchVelocity;
+		if (UGameplayStatics::SuggestProjectileVelocity_CustomArc(
+			this, LaunchVelocity, SpawnLocation, ActivationData.Target->GetActorLocation(), 0.0f, ProjectileArcParam))
+		{
+			Projectile->SetLaunchVelocity(LaunchVelocity);
+		}
 	}
 }

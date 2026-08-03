@@ -6,6 +6,7 @@
 #include "ProjectNayuta.h"
 
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -85,13 +86,20 @@ void ANYMonsterBase::Tick(float DeltaTime)
     }
 
     // Simple seek movement without navmesh.
-    FVector Direction = (ActivationData.Target->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+    const FVector ToTarget = ActivationData.Target->GetActorLocation() - GetActorLocation();
+    FVector Direction = ToTarget.GetSafeNormal();
 
     // Constant per-monster lean off the straight line, so the horde spreads instead of
     // funnelling into one point. Derived from the replicated seed, unlike a per-frame draw.
     Direction = Direction.RotateAngleAxis(ApproachAngleOffset, FVector::UpVector);
 
-    AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, true);
+    // Position holds still once within attack range (or mid-attack); facing keeps tracking the target.
+    // Without this, a ranged monster would keep closing to melee distance between attacks.
+    const bool bWithinAttackRange = ToTarget.SizeSquared() <= FMath::Square(AttackRange);
+    if (!IsAttacking() && !bWithinAttackRange)
+    {
+        AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, true);
+    }
 
     FRotator TargetRotation = Direction.Rotation();
     SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
@@ -112,6 +120,14 @@ void ANYMonsterBase::BeginPlay()
     CurrentHp = MaxHp;
     LastObservedHp = CurrentHp;
 
+    // A shorter interval would cut the swing off before the longest variant finishes playing.
+    for (const UAnimMontage* Montage : AttackMontages)
+    {
+        if (Montage)
+        {
+            AttackInterval = FMath::Max(AttackInterval, Montage->GetPlayLength());
+        }
+    }
 }
 
 
@@ -219,6 +235,12 @@ void ANYMonsterBase::StartDeathOnServer(AController* KillerController)
     }
 
     GetWorldTimerManager().SetTimer(DeathTimerHandle, this, &ANYMonsterBase::FinishDeathOnServer, DeathDuration, false);
+}
+
+void ANYMonsterBase::StopAttackOnServer()
+{
+    // Server-only: OnRep_ActivationData only ever sets this timer under HasAuthority().
+    GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 }
 
 void ANYMonsterBase::FinishDeathOnServer()
@@ -354,6 +376,21 @@ void ANYMonsterBase::OnRep_ActivationData()
         SetActorEnableCollision(false);
         SetActorTickEnabled(false);
     }
+
+    // Covers both idle-active (Target null) and deactivated monsters, matching the
+    // bIsActive branches above without duplicating the null check in each of them.
+    if (ActivationData.Target != nullptr)
+    {
+        // Server: only the authority ever ticks its own attack timer.
+        if (HasAuthority())
+        {
+            GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterBase::ProcessAttack, FMath::Max(AttackInterval, 0.01f), true);
+        }
+    }
+    else
+    {
+        GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+    }
 }
 
 
@@ -413,4 +450,64 @@ void ANYMonsterBase::ClearHitState()
 {
     StaggerEndTime = 0.0f;
     KnockbackVelocity = FVector::ZeroVector;
+}
+
+// Attack
+bool ANYMonsterBase::CanAttack() const
+{
+    if (ActivationData.Target == nullptr)
+    {
+        return false;
+    }
+
+    if (IsStaggered())
+    {
+        return false;
+    }
+
+    const float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
+    return DistSq <= FMath::Square(AttackRange);
+}
+
+void ANYMonsterBase::ProcessAttack()
+{
+    if (CanAttack())
+    {
+        PerformAttack();
+
+        UAnimMontage* ChosenMontage = AttackMontages.Num() > 0
+            ? AttackMontages[FMath::RandRange(0, AttackMontages.Num() - 1)]
+            : nullptr;
+
+        Multicast_OnAttackStarted(ChosenMontage);
+    }
+}
+
+bool ANYMonsterBase::IsAttacking() const
+{
+    const UWorld* World = GetWorld();
+    
+    return World && World->GetTimeSeconds() < AttackEndTime;
+}
+
+// NetMulticast
+void ANYMonsterBase::Multicast_OnAttackStarted_Implementation(UAnimMontage* MontageToPlay)
+{
+    // Runs on every machine, including the server, so the local seek simulation freezes in step.
+    if (const UWorld* World = GetWorld())
+    {
+        const float FreezeDuration = MontageToPlay ? MontageToPlay->GetPlayLength() : AttackFreezeDuration;
+        AttackEndTime = World->GetTimeSeconds() + FreezeDuration;
+    }
+
+    // Montage playback is presentation only; a dedicated server has nothing to render.
+    if (GetNetMode() == NM_DedicatedServer || !MontageToPlay)
+    {
+        return;
+    }
+
+    if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
+    {
+        AnimInstance->Montage_Play(MontageToPlay);
+    }
 }

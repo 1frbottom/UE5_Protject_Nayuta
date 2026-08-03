@@ -21,36 +21,20 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	virtual void OnRep_ActivationData() override;
-
 
 // Attack
 protected:
-	virtual void StopAttackOnServer() override;
+	virtual void PerformAttack() override;
 
 	/* Must be designated in BP_MonsterRanged */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	TSubclassOf<ANYAttackMonsterRanged> ProjectileClass;
 
+	/** 0 = flat/fast toss, 1 = high lob. Fed into SuggestProjectileVelocity_CustomArc. */
 	UPROPERTY(EditAnywhere, Category = "Attack")
-	float AttackRange = 500.0f;
-
-	UPROPERTY(VisibleAnywhere, Category = "Attack")
-	float AttackRangeSqrd;
-
-	UPROPERTY(EditAnywhere, Category = "Attack")
-	float FireRate = 2.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Attack")
-	float AttackDamage = 15.0f;
+	float ProjectileArcParam = 0.1f;
 
 private:
-	FTimerHandle FireCheckTimerHandle;
-	float LastFireTime;
-
-	UFUNCTION()
-	void CheckAndFire();
-
 	void FireProjectile();
 
 };

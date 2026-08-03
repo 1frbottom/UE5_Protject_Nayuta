@@ -17,6 +17,9 @@ class PROJECTNAYUTA_API ANYAttackMonsterRanged : public ANYAttackMonsterBase
 public:
 	ANYAttackMonsterRanged();
 
+	/** Overrides the auto-computed straight velocity so callers can lob this along an arc. */
+	void SetLaunchVelocity(const FVector& InVelocity);
+
 protected:
 	virtual void BeginPlay() override;
 

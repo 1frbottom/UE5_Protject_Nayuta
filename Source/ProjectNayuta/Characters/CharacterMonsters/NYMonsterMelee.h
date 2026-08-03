@@ -19,23 +19,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	virtual void OnRep_ActivationData() override;
-
 
 // Attack
 protected:
-	virtual void StopAttackOnServer() override;
-
-	UPROPERTY(EditAnywhere, Category = "Attack")
-	float AttackDamage = 10.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Attack")
-	float AttackInterval = 0.5f;
-
-private:
-	FTimerHandle AttackTimerHandle;
-
-	UFUNCTION()
-	void ProcessMeleeAttack();
+	virtual void PerformAttack() override;
 
 };

@@ -13,6 +13,10 @@
 ANYMonsterMelee::ANYMonsterMelee()
 {
 	RewardRowID = TEXT("Melee");
+
+	AttackDamage = 30.0f;
+	AttackRange = 200.0f;
+	AttackInterval = 0.5f;
 }
 
 void ANYMonsterMelee::BeginPlay()
@@ -21,46 +25,10 @@ void ANYMonsterMelee::BeginPlay()
 
 }
 
-void ANYMonsterMelee::OnRep_ActivationData()
-{
-    Super::OnRep_ActivationData();
-
-    if (ActivationData.Target != nullptr)
-    {
-        if (HasAuthority())
-        {
-            GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterMelee::ProcessMeleeAttack, AttackInterval, true);
-        }
-    }
-    else
-    {
-        GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-    }
-}
-
 
 // Attack
-void ANYMonsterMelee::StopAttackOnServer()
+void ANYMonsterMelee::PerformAttack()
 {
-	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-}
-
-void ANYMonsterMelee::ProcessMeleeAttack()
-{
-	if (ActivationData.Target == nullptr)
-		return;
-
-	// Being hit interrupts the swing; the timer keeps running and retries next interval.
-	if (IsStaggered())
-		return;
-
-	float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
-
-	float AttackRangeSq = FMath::Square(100.0f);
-
-	if (DistSq <= AttackRangeSq)
-	{
-		UGameplayStatics::ApplyDamage(ActivationData.Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
-	}
-
+	// Server-only: base's ProcessAttack only calls this after CanAttack() (target, stagger, range).
+	UGameplayStatics::ApplyDamage(ActivationData.Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
 }

@@ -12,6 +12,7 @@ class UCapsuleComponent;
 class USkeletalMeshComponent;
 class UWidgetComponent;
 class UNYHpBarWidgetMonster;
+class UAnimMontage;
 
 /** Replicated active/inactive state for pooled monsters (target + spawn snap). */
 USTRUCT()
@@ -126,8 +127,8 @@ protected:
     /** Authority-only: hand the corpse back to the pool (or destroy it when no pool exists). */
     void FinishDeathOnServer();
 
-    /** Authority-only: stop attack timers. Overridden by monsters that own one. */
-    virtual void StopAttackOnServer() {}
+    /** Authority-only: stop the shared attack timer. Override to add extra cleanup. */
+    virtual void StopAttackOnServer();
 
     UFUNCTION(BlueprintImplementableEvent, Category = "Death")
     void OnDeathFeedback();
@@ -142,6 +143,51 @@ protected:
 
 private:
     FTimerHandle DeathTimerHandle;
+
+
+// Attack
+public:
+    /** True while the current attack's freeze window is active (position holds; facing keeps tracking the target). */
+    bool IsAttacking() const;
+
+protected:
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackDamage = 10.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackRange = 100.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackInterval = 0.5f;
+
+    /** Presentation only. One is picked at random per attack. Must be designated in BP_MonsterMelee / BP_MonsterRanged. */
+    UPROPERTY(EditDefaultsOnly, Category = "Attack")
+    TArray<TObjectPtr<UAnimMontage>> AttackMontages;
+
+    /** Freeze duration used when no montage is assigned for the chosen attack. */
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackFreezeDuration = 0.3f;
+
+    /** Server-only. Gate for ProcessAttack: target, stagger, and range. Override to add extra conditions. */
+    virtual bool CanAttack() const;
+
+    /** Server-only. The actual attack effect (melee damage, projectile spawn, etc). */
+    virtual void PerformAttack() {}
+
+private:
+    FTimerHandle AttackTimerHandle;
+
+    /** Server-only. Bound to AttackTimerHandle; gates PerformAttack behind CanAttack. */
+    void ProcessAttack();
+
+    /**
+     * NetMulticast, Reliable. Runs on every machine (including the server) so the local seek
+     * simulation freezes in step; MontageToPlay may be null when no montage is assigned.
+     */
+    UFUNCTION(NetMulticast, Reliable, Category = "Attack")
+    void Multicast_OnAttackStarted(UAnimMontage* MontageToPlay);
+
+    float AttackEndTime = 0.0f;
 
 
 // Multiplay
