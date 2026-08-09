@@ -132,7 +132,7 @@ void UNYMonsterSpawnComponent::SpawnMonsterRoutine()
 
 		SpawnLocation.X += FMath::RandRange(-50.0f, 50.0f) * i;
 		SpawnLocation.Y += FMath::RandRange(-50.0f, 50.0f) * i;
-		SpawnLocation.Z += 50.0f;
+		// Z is resolved by ActivateOnServer → SnapLocationToFloor (player Z is only a probe hint).
 
 		ANYMonsterBase* SpawnedMonster = Pool->GetMonster(SpawnLocation, FRotator::ZeroRotator);
 		if (SpawnedMonster)

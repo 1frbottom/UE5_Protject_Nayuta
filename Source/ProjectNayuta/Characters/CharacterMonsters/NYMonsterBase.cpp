@@ -7,9 +7,11 @@
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 
 #include "Game/NYGameModeStage.h"
@@ -73,36 +75,43 @@ void ANYMonsterBase::Tick(float DeltaTime)
     // Idle monsters keep their tick off; a hit turns it back on just long enough to slide.
     if (ActivationData.Target == nullptr)
     {
-        if (!bKnockbackActive)
+        if (bKnockbackActive)
+        {
+            UpdateGroundedVertical(DeltaTime);
+        }
+        else
         {
             SetActorTickEnabled(false);
         }
         return;
     }
 
-    if (IsStaggered())
+    if (!IsStaggered())
     {
-        return;
+        // Horizontal seek only — vertical is owned by UpdateGroundedVertical (no navmesh).
+        const FVector ToTarget = ActivationData.Target->GetActorLocation() - GetActorLocation();
+        FVector Direction = ToTarget.GetSafeNormal2D();
+
+        // Constant per-monster lean off the straight line, so the horde spreads instead of
+        // funnelling into one point. Derived from the replicated seed, unlike a per-frame draw.
+        Direction = Direction.RotateAngleAxis(ApproachAngleOffset, FVector::UpVector);
+
+        // Position holds still once within attack range (or mid-attack); facing keeps tracking the target.
+        // Without this, a ranged monster would keep closing to melee distance between attacks.
+        const bool bWithinAttackRange = ToTarget.SizeSquared2D() <= FMath::Square(AttackRange);
+        if (!IsAttacking() && !bWithinAttackRange && !Direction.IsNearlyZero())
+        {
+            MoveHorizontal(Direction * RandomizedMoveSpeed * DeltaTime);
+        }
+
+        if (!Direction.IsNearlyZero())
+        {
+            const FRotator TargetRotation = Direction.Rotation();
+            SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
+        }
     }
 
-    // Simple seek movement without navmesh.
-    const FVector ToTarget = ActivationData.Target->GetActorLocation() - GetActorLocation();
-    FVector Direction = ToTarget.GetSafeNormal();
-
-    // Constant per-monster lean off the straight line, so the horde spreads instead of
-    // funnelling into one point. Derived from the replicated seed, unlike a per-frame draw.
-    Direction = Direction.RotateAngleAxis(ApproachAngleOffset, FVector::UpVector);
-
-    // Position holds still once within attack range (or mid-attack); facing keeps tracking the target.
-    // Without this, a ranged monster would keep closing to melee distance between attacks.
-    const bool bWithinAttackRange = ToTarget.SizeSquared() <= FMath::Square(AttackRange);
-    if (!IsAttacking() && !bWithinAttackRange)
-    {
-        AddActorWorldOffset(Direction * RandomizedMoveSpeed * DeltaTime, true);
-    }
-
-    FRotator TargetRotation = Direction.Rotation();
-    SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
+    UpdateGroundedVertical(DeltaTime);
 }
 
 void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -127,6 +136,119 @@ void ANYMonsterBase::BeginPlay()
         {
             AttackInterval = FMath::Max(AttackInterval, Montage->GetPlayLength());
         }
+    }
+}
+
+
+bool ANYMonsterBase::TryFindFloorZ(const FVector& Location, float& OutCapsuleCenterZ) const
+{
+    const UWorld* World = GetWorld();
+    if (!World || !CapsuleComp)
+    {
+        return false;
+    }
+
+    const FVector TraceStart(Location.X, Location.Y, Location.Z + FloorTraceUpOffset);
+    const FVector TraceEnd(Location.X, Location.Y, Location.Z - FloorTraceDownDistance);
+
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(MonsterFloor), false, this);
+    FHitResult Hit;
+    // ByObjectType(WorldStatic) only, so other monsters/players (unset Visibility response
+    // defaults to Block on their profiles) can never be mistaken for the floor.
+    if (!World->LineTraceSingleByObjectType(Hit, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic), Params))
+    {
+        return false;
+    }
+
+    // +FloorClearance: never let the capsule rest exactly on the surface (see FloorClearance).
+    OutCapsuleCenterZ = Hit.ImpactPoint.Z + CapsuleComp->GetScaledCapsuleHalfHeight() + FloorClearance;
+    return true;
+}
+
+FVector ANYMonsterBase::SnapLocationToFloor(const FVector& Location) const
+{
+    float FloorCapsuleZ = Location.Z;
+    if (TryFindFloorZ(Location, FloorCapsuleZ))
+    {
+        return FVector(Location.X, Location.Y, FloorCapsuleZ);
+    }
+
+    return Location;
+}
+
+void ANYMonsterBase::MoveHorizontal(const FVector& Delta)
+{
+    FHitResult Hit;
+    AddActorWorldOffset(Delta, true, &Hit);
+
+    if (!Hit.bBlockingHit)
+    {
+        return;
+    }
+
+    const FVector Remaining = Delta * (1.0f - Hit.Time);
+
+    if (Hit.Normal.Z >= WalkableNormalZ)
+    {
+        // Slope, not a wall (real walls have a near-vertical Normal.Z) — slide the unswept
+        // remainder along the surface instead of stopping dead. No AActor-level movement
+        // component gives us this for free, so it is projected by hand.
+        AddActorWorldOffset(FVector::VectorPlaneProject(Remaining, Hit.Normal), true);
+        return;
+    }
+
+    // Near-vertical face: may be a stair riser rather than a wall. Reuses MaxFloorSnapUp as
+    // the step height. Hop up and retry; if still blocked up there, undo (it was a real wall).
+    // UpdateGroundedVertical settles the capsule back onto the stair tread next tick.
+    AddActorWorldOffset(FVector(0.0f, 0.0f, MaxFloorSnapUp), true);
+
+    FHitResult StepHit;
+    AddActorWorldOffset(Remaining, true, &StepHit);
+
+    if (StepHit.bBlockingHit)
+    {
+        AddActorWorldOffset(FVector(0.0f, 0.0f, -MaxFloorSnapUp), true);
+    }
+}
+
+void ANYMonsterBase::UpdateGroundedVertical(float DeltaTime)
+{
+    const FVector Location = GetActorLocation();
+
+    float FloorCapsuleZ = Location.Z;
+    if (TryFindFloorZ(Location, FloorCapsuleZ))
+    {
+        const float DeltaZ = FloorCapsuleZ - Location.Z;
+
+        // Floor is in range : snap
+        if (DeltaZ <= MaxFloorSnapUp && DeltaZ >= -MaxFloorSnapDown)
+        {
+            if (!FMath::IsNearlyEqual(Location.Z, FloorCapsuleZ, 0.1f))
+            {
+                SetActorLocation(FVector(Location.X, Location.Y, FloorCapsuleZ));
+            }
+            VerticalVelocity = 0.0f;
+            return;
+        }
+
+        // Floor is far below : fall, then catch when the capsule reaches it
+        // this condition is excuted only when end of falling (to stop by destination Z)
+        if (DeltaZ < -MaxFloorSnapDown && Location.Z + VerticalVelocity * DeltaTime <= FloorCapsuleZ)
+        {
+            SetActorLocation(FVector(Location.X, Location.Y, FloorCapsuleZ));
+            VerticalVelocity = 0.0f;
+            return;
+        }
+    }
+
+    VerticalVelocity -= Gravity * DeltaTime;
+    AddActorWorldOffset(FVector(0.0f, 0.0f, VerticalVelocity * DeltaTime), true);
+
+    const FVector FallenLocation = GetActorLocation();
+    if (TryFindFloorZ(FallenLocation, FloorCapsuleZ) && FallenLocation.Z <= FloorCapsuleZ)
+    {
+        SetActorLocation(FVector(FallenLocation.X, FallenLocation.Y, FloorCapsuleZ));
+        VerticalVelocity = 0.0f;
     }
 }
 
@@ -281,13 +403,15 @@ void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
 
     CurrentHp = MaxHp;
 
-    SetActorLocation(StartLocation);
+    // Server snaps once; clients receive the floored Z via ActivationData.SpawnLocation.
+    const FVector SnappedLocation = SnapLocationToFloor(StartLocation);
+    SetActorLocation(SnappedLocation);
     SetNetDormancy(DORM_Awake);
 
     FMonsterActivationData NewData;
     NewData.bIsActive = true;
     NewData.Target = NewTarget;
-    NewData.SpawnLocation = StartLocation;
+    NewData.SpawnLocation = SnappedLocation;
     NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
     ActivationData = NewData;
 
@@ -303,13 +427,14 @@ void ANYMonsterBase::ActivateIdleOnServer(FVector StartLocation)
 
     CurrentHp = MaxHp;
 
-    SetActorLocation(StartLocation);
+    const FVector SnappedLocation = SnapLocationToFloor(StartLocation);
+    SetActorLocation(SnappedLocation);
     SetNetDormancy(DORM_Awake);
 
     FMonsterActivationData NewData;
     NewData.bIsActive = true;
     NewData.Target = nullptr;
-    NewData.SpawnLocation = StartLocation;
+    NewData.SpawnLocation = SnappedLocation;
     NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
     ActivationData = NewData;
 
@@ -344,6 +469,7 @@ void ANYMonsterBase::OnRep_ActivationData()
     {
         // Apply authoritative spawn position on clients (movement is not replicated).
         SetActorLocation(ActivationData.SpawnLocation);
+        VerticalVelocity = 0.0f;
 
         SetActorHiddenInGame(false);
         SetActorEnableCollision(true);
@@ -450,6 +576,7 @@ void ANYMonsterBase::ClearHitState()
 {
     StaggerEndTime = 0.0f;
     KnockbackVelocity = FVector::ZeroVector;
+    VerticalVelocity = 0.0f;
 }
 
 // Attack
@@ -465,7 +592,7 @@ bool ANYMonsterBase::CanAttack() const
         return false;
     }
 
-    const float DistSq = FVector::DistSquared(GetActorLocation(), ActivationData.Target->GetActorLocation());
+    const float DistSq = FVector::DistSquaredXY(GetActorLocation(), ActivationData.Target->GetActorLocation());
     return DistSq <= FMath::Square(AttackRange);
 }
 
