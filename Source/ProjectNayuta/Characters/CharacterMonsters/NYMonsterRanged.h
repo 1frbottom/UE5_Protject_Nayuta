@@ -30,9 +30,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	TSubclassOf<ANYAttackMonsterRanged> ProjectileClass;
 
-	/** 0 = flat/fast toss, 1 = high lob. Fed into SuggestProjectileVelocity_CustomArc. */
+	/** 0 ~ 1 : stiff to flat*/
 	UPROPERTY(EditAnywhere, Category = "Attack")
-	float ProjectileArcParam = 0.1f;
+	float ProjectileArcParam = 0.8f;
 
 private:
 	void FireProjectile();

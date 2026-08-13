@@ -24,6 +24,9 @@ namespace
 {
     /** Knockback below this speed (cm/s) is snapped to zero so the tick can go back to sleep. */
     constexpr float KnockbackRestSpeed = 5.0f;
+
+    /** Pushes the step probe this far past the capsule surface so it clears the blocking face. */
+    constexpr float StepProbeForwardOffset = 5.0f;
 }
 
 ANYMonsterBase::ANYMonsterBase()
@@ -197,17 +200,47 @@ void ANYMonsterBase::MoveHorizontal(const FVector& Delta)
         return;
     }
 
-    // Near-vertical face: may be a stair riser rather than a wall. Reuses MaxFloorSnapUp as
-    // the step height. Hop up and retry; if still blocked up there, undo (it was a real wall).
-    // UpdateGroundedVertical settles the capsule back onto the stair tread next tick.
-    AddActorWorldOffset(FVector(0.0f, 0.0f, MaxFloorSnapUp), true);
+    // Near-vertical face: may be a stair riser rather than a wall. Measure the floor just past
+    // the face and lift exactly that far. Lifting a fixed MaxFloorSnapUp instead would leave the
+    // capsule airborne on shallow steps, and UpdateGroundedVertical would drop it back down —
+    // that round trip is the visible pop when climbing.
+    const FVector StepDirection = Delta.GetSafeNormal2D();
+    if (!CapsuleComp || StepDirection.IsNearlyZero() || Remaining.IsNearlyZero())
+    {
+        return;
+    }
+
+    const FVector Location = GetActorLocation();
+    const float ProbeDistance = CapsuleComp->GetScaledCapsuleRadius() + StepProbeForwardOffset;
+
+    // Probed from a full step above so any tread within MaxFloorSnapUp is inside the trace range.
+    // An overhang there reads as an out-of-range step, which leaves the monster blocked.
+    FVector ProbeLocation = Location + StepDirection * ProbeDistance;
+    ProbeLocation.Z += MaxFloorSnapUp;
+
+    float StepCapsuleZ = 0.0f;
+    if (!TryFindFloorZ(ProbeLocation, StepCapsuleZ))
+    {
+        return;
+    }
+
+    const float StepUpHeight = StepCapsuleZ - Location.Z;
+    if (StepUpHeight <= 0.0f || StepUpHeight > MaxFloorSnapUp)
+    {
+        return;
+    }
+
+    AddActorWorldOffset(FVector(0.0f, 0.0f, StepUpHeight), true);
+
+    // The sweep above may have been cut short by a ceiling, so undo by what actually moved.
+    const float LiftedZ = GetActorLocation().Z;
 
     FHitResult StepHit;
     AddActorWorldOffset(Remaining, true, &StepHit);
 
     if (StepHit.bBlockingHit)
     {
-        AddActorWorldOffset(FVector(0.0f, 0.0f, -MaxFloorSnapUp), true);
+        AddActorWorldOffset(FVector(0.0f, 0.0f, Location.Z - LiftedZ), true);
     }
 }
 

@@ -10,7 +10,7 @@ public class ProjectNayuta : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem" });
 
         PublicIncludePaths.AddRange(new string[] { "ProjectNayuta" });
 

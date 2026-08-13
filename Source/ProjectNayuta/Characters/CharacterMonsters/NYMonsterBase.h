@@ -84,7 +84,7 @@ protected:
     float FloorTraceDownDistance = 1000.0f;
 
     /**
-     * Max upward Z correction per update, and the hop height MoveHorizontal tries when a
+     * Max upward Z correction per update, and the tallest step MoveHorizontal will climb when a
      * near-vertical hit might be a stair riser. Beyond this the probe/step is ignored.
      */
     UPROPERTY(EditAnywhere, Category = "Movement")
@@ -95,14 +95,14 @@ protected:
      * to the valley floor.
      */
     UPROPERTY(EditAnywhere, Category = "Movement")
-    float MaxFloorSnapDown = 80.0f;
+    float MaxFloorSnapDown = 100.0f;
 
     /**
      * Minimum surface Normal.Z to treat a blocked sweep as walkable terrain to slide along
      * rather than a wall to stop at. ~0.7 matches CMC's default ~44-degree walkable angle.
      */
     UPROPERTY(EditAnywhere, Category = "Movement")
-    float WalkableNormalZ = 0.7f;
+    float WalkableNormalZ = 0.1f;
 
     /**
      * Kept hovering this far above the floor surface (never touching it exactly). Without this,
@@ -125,6 +125,7 @@ private:
     /**
      * Sweeps Delta; on a blocking hit against a walkable slope (see WalkableNormalZ), slides the
      * remainder along the surface instead of stopping dead, so real walls still block movement.
+     * A near-vertical hit is climbed only by the measured step height, up to MaxFloorSnapUp.
      */
     void MoveHorizontal(const FVector& Delta);
 
