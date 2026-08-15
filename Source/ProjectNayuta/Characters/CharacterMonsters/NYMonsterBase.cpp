@@ -12,11 +12,10 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/GameModeBase.h"
 #include "Net/UnrealNetwork.h"
 
-#include "Game/NYGameModeStage.h"
-#include "Game/NYGameModeTraining.h"
-#include "Game/NYMonsterPoolComponent.h"
+#include "Game/NYMonsterLifecycleInterface.h"
 
 
 
@@ -331,13 +330,16 @@ void ANYMonsterBase::OnRep_CurrentHp()
     const float DamageTaken = LastObservedHp - CurrentHp;
     LastObservedHp = CurrentHp;
 
-    // The lethal hit belongs to the death animation, not to a stagger.
-    if (DamageTaken > 0.0f && CurrentHp > 0.0f)
+    if (DamageTaken > 0.0f)
     {
-        // Gameplay runs everywhere, including a dedicated server, so the authoritative
-        // position stays in step with what players are looking at.
-        BeginStagger();
-        BeginKnockback();
+        // Stagger/knockback are for living monsters. A corpse should not slide.
+        if (CurrentHp > 0.0f)
+        {
+            // Gameplay runs everywhere, including a dedicated server, so the authoritative
+            // position stays in step with what players are looking at.
+            BeginStagger();
+            BeginKnockback();
+        }
 
         if (GetNetMode() != NM_DedicatedServer)
         {
@@ -348,6 +350,13 @@ void ANYMonsterBase::OnRep_CurrentHp()
     // Runs on server and clients: a corpse keeps rendering but stops colliding and seeking.
     if (CurrentHp <= 0.0f && ActivationData.bIsActive)
     {
+        // Attack (and the hurt montage from OnHitFeedback) occupy the slot until stopped.
+        // Without this, AnimGraph death waits for the attack montage to finish.
+        if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.15f);
+        }
+
         if (GetNetMode() != NM_DedicatedServer)
         {
             OnDeathFeedback();
@@ -371,12 +380,12 @@ void ANYMonsterBase::StartDeathOnServer(AController* KillerController)
     StopAttackOnServer();
 
     // Kill count and rewards are granted immediately; only the cleanup waits for the animation.
-    if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
+    if (INYMonsterLifecycleInterface* LifecycleHost = GetLifecycleHost())
     {
-        GM->OnEnemyKilled(KillerController, this);
+        LifecycleHost->NotifyMonsterKilled(KillerController, this);
     }
 
-    // OnEnemyKilled can end the wave, which already returned every monster to the pool.
+    // NotifyMonsterKilled can end the wave, which already returned every monster to the pool.
     if (!ActivationData.bIsActive)
     {
         bIsDying = false;
@@ -407,22 +416,24 @@ void ANYMonsterBase::FinishDeathOnServer()
 
     bIsDying = false;
 
-    if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
+    // What a corpse becomes is the host's call: Stage pools it, Training resets it in place.
+    // Only when nobody claims it does the monster clean itself up.
+    if (INYMonsterLifecycleInterface* LifecycleHost = GetLifecycleHost())
     {
-        if (UNYMonsterPoolComponent* Pool = GM->GetMonsterPoolComponent())
+        if (LifecycleHost->ReclaimMonster(this))
         {
-            Pool->ReturnMonster(this);
             return;
         }
     }
-    else if (ANYGameModeTraining* TrainingGM = Cast<ANYGameModeTraining>(GetWorld()->GetAuthGameMode()))
-    {
-        // Training reuses the same actor: the reset re-activates it and refills HP.
-        TrainingGM->NotifyTrainingMonsterDefeated(this);
-        return;
-    }
 
     Destroy();
+}
+
+INYMonsterLifecycleInterface* ANYMonsterBase::GetLifecycleHost() const
+{
+    const UWorld* World = GetWorld();
+
+    return World ? Cast<INYMonsterLifecycleInterface>(World->GetAuthGameMode()) : nullptr;
 }
 
 
@@ -444,29 +455,6 @@ void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
     FMonsterActivationData NewData;
     NewData.bIsActive = true;
     NewData.Target = NewTarget;
-    NewData.SpawnLocation = SnappedLocation;
-    NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
-    ActivationData = NewData;
-
-    OnRep_ActivationData();
-}
-
-void ANYMonsterBase::ActivateIdleOnServer(FVector StartLocation)
-{
-    if (!HasAuthority())
-    {
-        return;
-    }
-
-    CurrentHp = MaxHp;
-
-    const FVector SnappedLocation = SnapLocationToFloor(StartLocation);
-    SetActorLocation(SnappedLocation);
-    SetNetDormancy(DORM_Awake);
-
-    FMonsterActivationData NewData;
-    NewData.bIsActive = true;
-    NewData.Target = nullptr;
     NewData.SpawnLocation = SnappedLocation;
     NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
     ActivationData = NewData;

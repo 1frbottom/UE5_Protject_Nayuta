@@ -145,31 +145,6 @@ bool ANYGameModeStage::TryGetWeaponLevelRow(FName WeaponID, int32 Level, FNYWeap
 	return NYWeaponLevel::TryGetRow(GS ? GS->WeaponLevelDataTable : nullptr, WeaponID, Level, OutRow);
 }
 
-void ANYGameModeStage::OnEnemyKilled(AController* KillerController, ANYMonsterBase* KilledMonster)
-{
-	CurrKillCnt++;
-
-	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
-	{
-		GS->ReplicatedKillCnt = CurrKillCnt;
-	}
-
-	if (KilledMonster)
-	{
-		int32 ExpReward = 0;
-		int32 GoldReward = 0;
-		if (TryGetMonsterRewards(KilledMonster->GetRewardRowID(), ExpReward, GoldReward))
-		{
-			GrantKillRewards(KillerController, ExpReward, GoldReward);
-		}
-	}
-
-	if (CurrKillCnt >= TargetKillCnt)
-	{
-		StartRewardPhase();
-	}
-}
-
 void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 {
 	(void)PC_victim;
@@ -365,9 +340,7 @@ void ANYGameModeStage::StartRewardPhase()
 	for (AActor* Actor : AliveMonsters)
 		if (ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Actor))
 		{
-			if (MonsterPoolComponent)
-				MonsterPoolComponent->ReturnMonster(Monster);
-			else
+			if (!ReclaimMonster(Monster))
 				Monster->Destroy();
 		}
 
@@ -411,7 +384,7 @@ void ANYGameModeStage::StartRewardPhase()
 
 	TryAdvanceWaveAfterRewards();
 
-	// TODO: Reward selection timeout timer.
+	// !TODO: Reward selection timeout timer.
 }
 
 namespace NYRewardGeneration
@@ -864,4 +837,41 @@ void ANYGameModeStage::GrantKillRewards(AController* KillerController, int32 Exp
 			GrantToPlayerState(Cast<ANYPlayerStateStage>(PS));
 		}
 	}
+}
+
+void ANYGameModeStage::NotifyMonsterKilled(AController* KillerController, ANYMonsterBase* Monster)
+{
+	CurrKillCnt++;
+
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		GS->ReplicatedKillCnt = CurrKillCnt;
+	}
+
+	if (Monster)
+	{
+		int32 ExpReward = 0;
+		int32 GoldReward = 0;
+		if (TryGetMonsterRewards(Monster->GetRewardRowID(), ExpReward, GoldReward))
+		{
+			GrantKillRewards(KillerController, ExpReward, GoldReward);
+		}
+	}
+
+	if (CurrKillCnt >= TargetKillCnt)
+	{
+		StartRewardPhase();
+	}
+}
+
+bool ANYGameModeStage::ReclaimMonster(ANYMonsterBase* Monster)
+{
+	if (!MonsterPoolComponent || !Monster)
+	{
+		return false;
+	}
+
+	MonsterPoolComponent->ReturnMonster(Monster);
+
+	return true;
 }

@@ -10,6 +10,8 @@
 #include "Weapons/NYWeaponComponent.h"
 #include "Weapons/NYWeaponDefinition.h"
 
+
+
 ANYGameModeTraining::ANYGameModeTraining()
 {
 	// Local sandbox — no lobby/session travel.
@@ -132,22 +134,6 @@ void ANYGameModeTraining::ResetTrainingMonster(APlayerController* RequestingPC)
 	ApplyTrainingMode(RequestingPC);
 }
 
-void ANYGameModeTraining::NotifyTrainingMonsterDefeated(ANYMonsterBase* Monster)
-{
-	if (!HasAuthority() || !Monster || Monster != ActiveTrainingMonster)
-	{
-		return;
-	}
-
-	APlayerController* PC = nullptr;
-	if (UWorld* World = GetWorld())
-	{
-		PC = World->GetFirstPlayerController();
-	}
-
-	ResetTrainingMonster(PC);
-}
-
 void ANYGameModeTraining::SetTrainingPlayerMaxHp(APlayerController* RequestingPC, float NewMaxHp)
 {
 	if (!HasAuthority() || !RequestingPC)
@@ -223,21 +209,12 @@ void ANYGameModeTraining::ApplyTrainingMode(APlayerController* RequestingPC)
 		return;
 	}
 
-	const FVector SpawnLocation = TrainingSpawnTransform.GetLocation();
+	// A null target is what makes the monster idle: it stays visible but never seeks or attacks.
+	AActor* TargetActor = (CurrentTrainingMode == ENYTrainingMonsterMode::Chase && RequestingPC)
+		? RequestingPC->GetPawn()
+		: nullptr;
 
-	switch (CurrentTrainingMode)
-	{
-	case ENYTrainingMonsterMode::Idle:
-		ActiveTrainingMonster->ActivateIdleOnServer(SpawnLocation);
-		break;
-
-	case ENYTrainingMonsterMode::Chase:
-	{
-		AActor* TargetActor = RequestingPC ? RequestingPC->GetPawn() : nullptr;
-		ActiveTrainingMonster->ActivateOnServer(TargetActor, SpawnLocation);
-		break;
-	}
-	}
+	ActiveTrainingMonster->ActivateOnServer(TargetActor, TrainingSpawnTransform.GetLocation());
 }
 
 void ANYGameModeTraining::ApplyMonsterMaxHpOverride()
@@ -248,4 +225,17 @@ void ANYGameModeTraining::ApplyMonsterMaxHpOverride()
 	}
 
 	ActiveTrainingMonster->SetMaxHpOnServer(TrainingMonsterMaxHpOverride);
+}
+
+bool ANYGameModeTraining::ReclaimMonster(ANYMonsterBase* Monster)
+{
+	if (!HasAuthority() || !Monster || Monster != ActiveTrainingMonster)
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	ResetTrainingMonster(World ? World->GetFirstPlayerController() : nullptr);
+	
+	return true;
 }

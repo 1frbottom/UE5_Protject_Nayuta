@@ -13,6 +13,7 @@ class USkeletalMeshComponent;
 class UWidgetComponent;
 class UNYHpBarWidgetMonster;
 class UAnimMontage;
+class INYMonsterLifecycleInterface;
 
 /** Replicated active/inactive state for pooled monsters (target + spawn snap). */
 USTRUCT()
@@ -102,7 +103,7 @@ protected:
      * rather than a wall to stop at. ~0.7 matches CMC's default ~44-degree walkable angle.
      */
     UPROPERTY(EditAnywhere, Category = "Movement")
-    float WalkableNormalZ = 0.1f;
+    float WalkableNormalZ = 0.7f;
 
     /**
      * Kept hovering this far above the floor surface (never touching it exactly). Without this,
@@ -199,6 +200,12 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category = "Death")
     void OnDeathFeedback();
 
+    /**
+     * The authoritative GameMode when it owns monster lifetime, otherwise null. Resolved per call
+     * instead of cached, since a pooled monster outlives nothing but is reused across waves.
+     */
+    INYMonsterLifecycleInterface* GetLifecycleHost() const;
+
     /** Seconds the corpse stays visible so every machine can play the death animation. */
     UPROPERTY(EditAnywhere, Category = "Death")
     float DeathDuration = 2.0f;
@@ -260,11 +267,12 @@ private:
 public:
     FORCEINLINE bool IsActive() const { return ActivationData.bIsActive; }
 
-    /** Authority-only: show at location and chase NewTarget (pooled combat spawn). */
+    /**
+     * Authority-only: show at StartLocation and chase NewTarget.
+     * A null NewTarget activates the monster idle — visible and collidable, but it never
+     * seeks or attacks (training sandbox).
+     */
     void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
-
-    /** Authority-only: show at location with no chase target (training idle). */
-    void ActivateIdleOnServer(FVector StartLocation);
 
     void DeactivateOnServer();  
 
@@ -284,8 +292,8 @@ public:
 protected:
     /**
      * Presentation only (montage, SFX, flash), authored in Blueprint.
-     * Fires on every machine that renders this monster, never on a dedicated server,
-     * and is skipped for the lethal hit so the death animation owns that moment.
+     * Fires on every machine that renders this monster, never on a dedicated server.
+     * Lethal hits still fire this so the hit flash plays; stagger/knockback do not.
      */
     UFUNCTION(BlueprintImplementableEvent, Category = "Hit")
     void OnHitFeedback(float DamageTaken);

@@ -8,6 +8,7 @@
 
 #include "Game/NYStageDataRows.h"
 #include "Game/NYRewardTypes.h"
+#include "Game/NYMonsterLifecycleInterface.h"
 #include "Player/NYPlayerStateStage.h"
 
 #include "NYGameModeStage.generated.h"
@@ -27,7 +28,7 @@ class UNYWeaponDefinition;
  * 
  */
 UCLASS()
-class PROJECTNAYUTA_API ANYGameModeStage : public ANYGameModeBase
+class PROJECTNAYUTA_API ANYGameModeStage : public ANYGameModeBase, public INYMonsterLifecycleInterface
 {
 	GENERATED_BODY()
 
@@ -77,8 +78,6 @@ public:
 	int32 CurrKillCnt = 0;
 	int32 TargetKillCnt = 0;
 
-	// Server: kill count + reward grant. Killer may be null (rewards all alive players).
-	void OnEnemyKilled(class AController* KillerController, class ANYMonsterBase* KilledMonster);
 	void OnPlayerDied(ANYPlayerControllerStage* PC_victim);
 
 protected:
@@ -155,5 +154,14 @@ protected:
 
 	UPROPERTY(Transient)
 	TSubclassOf<ANYMonsterBase> CachedPoolMonsterClass;
+
+
+// MonsterLifecycle
+public:
+	/** Server: kill count + reward grant. Killer may be null (rewards all alive players). */
+	virtual void NotifyMonsterKilled(AController* KillerController, ANYMonsterBase* Monster) override;
+
+	/** Server: hand the corpse back to the pool. False when no pool exists, so the caller destroys it. */
+	virtual bool ReclaimMonster(ANYMonsterBase* Monster) override;
 
 };

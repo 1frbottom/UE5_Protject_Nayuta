@@ -4,7 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Game/NYGameModeBase.h"
+#include "Game/NYMonsterLifecycleInterface.h"
 #include "NYGameModeTraining.generated.h"
+
+
 
 class ANYMonsterBase;
 class UNYWeaponDefinition;
@@ -20,7 +23,7 @@ enum class ENYTrainingMonsterMode : uint8
  * Standalone weapon / combat sandbox. Reuses Stage PS/Pawn/GS without wave/reward loop.
  */
 UCLASS()
-class PROJECTNAYUTA_API ANYGameModeTraining : public ANYGameModeBase
+class PROJECTNAYUTA_API ANYGameModeTraining : public ANYGameModeBase, public INYMonsterLifecycleInterface
 {
 	GENERATED_BODY()
 
@@ -41,9 +44,6 @@ public:
 
 	/** Server: snap back to TrainingSpawnTransform, full HP, re-apply current mode. */
 	void ResetTrainingMonster(APlayerController* RequestingPC);
-
-	/** Server: called from monster TakeDamage when HP hits 0 in Training. */
-	void NotifyTrainingMonsterDefeated(ANYMonsterBase* Monster);
 
 	/** Server: set MaxHP + refill CurrHp on the requesting player's PlayerState. */
 	void SetTrainingPlayerMaxHp(APlayerController* RequestingPC, float NewMaxHp);
@@ -84,4 +84,13 @@ protected:
 	/** 0 = use monster class default MaxHp. */
 	UPROPERTY(Transient)
 	float TrainingMonsterMaxHpOverride = 0.0f;
+
+
+// MonsterLifecycle
+public:
+	/**
+	 * Server: the sandbox monster is reused instead of pooled, so a defeat resets it in place.
+	 * False for anything that is not the active test monster, which lets it destroy itself.
+	 */
+	virtual bool ReclaimMonster(ANYMonsterBase* Monster) override;
 };
