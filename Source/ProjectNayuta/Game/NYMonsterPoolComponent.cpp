@@ -32,9 +32,9 @@ void UNYMonsterPoolComponent::InitializePool(TSubclassOf<ANYMonsterBase> Monster
 
 		if (SpawnedMonster)
 		{
-			SpawnedMonster->SetActorHiddenInGame(true);
-			SpawnedMonster->SetActorEnableCollision(false);
-			SpawnedMonster->SetActorTickEnabled(false);
+			// Same path a returned corpse takes, so a pre-warmed monster and a recycled one
+			// start from identical hidden/dormant state.
+			SpawnedMonster->DeactivateOnServer();
 			InactivePool.Add(SpawnedMonster);
 		}
 	}

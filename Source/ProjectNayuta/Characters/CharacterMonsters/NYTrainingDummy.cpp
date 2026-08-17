@@ -56,6 +56,6 @@ void ANYTrainingDummy::ForceActivePresentation()
 	SetNetDormancy(DORM_Awake);
 	SetActorHiddenInGame(false);
 	SetActorEnableCollision(true);
-	SetActorTickEnabled(false);
+	RefreshTickState();
 	OnRep_CurrentHp();
 }

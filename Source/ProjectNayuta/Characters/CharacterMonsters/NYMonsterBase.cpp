@@ -83,7 +83,8 @@ void ANYMonsterBase::Tick(float DeltaTime)
         }
         else
         {
-            SetActorTickEnabled(false);
+            // UpdateKnockback() zeroed the velocity, so the monster goes back to sleep here.
+            RefreshTickState();
         }
         return;
     }
@@ -141,6 +142,22 @@ void ANYMonsterBase::BeginPlay()
     }
 }
 
+bool ANYMonsterBase::ShouldTick() const
+{
+    // A pooled or dead monster has nothing to simulate; a corpse still renders its death animation.
+    if (!ActivationData.bIsActive || CurrentHp <= 0.0f)
+    {
+        return false;
+    }
+
+    // Seeking runs per frame. An idle monster only wakes up for the length of a knockback slide.
+    return ActivationData.Target != nullptr || !KnockbackVelocity.IsNearlyZero();
+}
+
+void ANYMonsterBase::RefreshTickState()
+{
+    SetActorTickEnabled(ShouldTick());
+}
 
 bool ANYMonsterBase::TryFindFloorZ(const FVector& Location, float& OutCapsuleCenterZ) const
 {
@@ -363,7 +380,7 @@ void ANYMonsterBase::OnRep_CurrentHp()
         }
 
         SetActorEnableCollision(false);
-        SetActorTickEnabled(false);
+        RefreshTickState();
     }
 }
 
@@ -494,8 +511,6 @@ void ANYMonsterBase::OnRep_ActivationData()
 
         SetActorHiddenInGame(false);
         SetActorEnableCollision(true);
-        // Tick only when chasing; idle stays visible without seek.
-        SetActorTickEnabled(ActivationData.Target != nullptr);
 
         ClearHitState();
 
@@ -521,7 +536,6 @@ void ANYMonsterBase::OnRep_ActivationData()
 
         SetActorHiddenInGame(true);
         SetActorEnableCollision(false);
-        SetActorTickEnabled(false);
     }
 
     // Covers both idle-active (Target null) and deactivated monsters, matching the
@@ -538,6 +552,9 @@ void ANYMonsterBase::OnRep_ActivationData()
     {
         GetWorldTimerManager().ClearTimer(AttackTimerHandle);
     }
+
+    // Last, so ShouldTick() reads the state both branches above have finished settling.
+    RefreshTickState();
 }
 
 
@@ -570,7 +587,7 @@ void ANYMonsterBase::BeginKnockback()
     KnockbackVelocity = Away * KnockbackSpeed;
 
     // An idle monster has its tick off; the slide needs it back for a moment.
-    SetActorTickEnabled(true);
+    RefreshTickState();
 }
 
 bool ANYMonsterBase::UpdateKnockback(float DeltaTime)

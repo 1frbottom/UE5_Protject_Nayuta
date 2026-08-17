@@ -70,6 +70,22 @@ protected:
     TObjectPtr<class UStaticMeshComponent> SphereComp;
 
 
+// Tick
+protected:
+    /**
+     * True while this monster needs a per-frame update: chasing a target, or sliding out the
+     * remainder of a knockback. Override to keep a subclass permanently off the tick.
+     */
+    virtual bool ShouldTick() const;
+
+    /**
+     * The one place that flips the actor tick. Call this after any state change that can alter
+     * ShouldTick() rather than touching SetActorTickEnabled() directly, so no path can strand
+     * the tick on (an idle horde burning frames) or off (a monster frozen mid-chase).
+     */
+    void RefreshTickState();
+
+
 // Movement
 protected:
     /** Downward acceleration (cm/s^2) while no floor is within snap range. */

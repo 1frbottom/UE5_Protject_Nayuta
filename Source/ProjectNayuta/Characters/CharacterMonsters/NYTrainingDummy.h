@@ -21,6 +21,11 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void OnRep_ActivationData() override;
 
+// Tick
+protected:
+	/** Never seeks or gets knocked back, so it has nothing to simulate per frame. */
+	virtual bool ShouldTick() const override { return false; }
+
 // Stat
 public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
