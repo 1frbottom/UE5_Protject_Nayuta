@@ -7,7 +7,6 @@
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
-#include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -15,18 +14,10 @@
 #include "GameFramework/GameModeBase.h"
 #include "Net/UnrealNetwork.h"
 
+#include "Characters/CharacterMonsters/NYMonsterMovementComponent.h"
 #include "Game/NYMonsterLifecycleInterface.h"
 
 
-
-namespace
-{
-    /** Knockback below this speed (cm/s) is snapped to zero so the tick can go back to sleep. */
-    constexpr float KnockbackRestSpeed = 5.0f;
-
-    /** Pushes the step probe this far past the capsule surface so it clears the blocking face. */
-    constexpr float StepProbeForwardOffset = 5.0f;
-}
 
 ANYMonsterBase::ANYMonsterBase()
 {
@@ -60,6 +51,9 @@ ANYMonsterBase::ANYMonsterBase()
     SphereComp->SetupAttachment(RootComponent);
     SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    // Binds to the root capsule on registration; this actor's Tick drives every update.
+    MovementComp = CreateDefaultSubobject<UNYMonsterMovementComponent>(TEXT("MovementComp"));
+
 
 }
 
@@ -67,25 +61,27 @@ void ANYMonsterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (CurrentHp <= 0.0f)
+	if (CurrentHp <= 0.0f || !MovementComp)
 	{
 		return;
 	}
 
-    const bool bKnockbackActive = UpdateKnockback(DeltaTime);
+    const bool bKnockbackActive = MovementComp->UpdateKnockback(DeltaTime);
 
     // Idle monsters keep their tick off; a hit turns it back on just long enough to slide.
     if (ActivationData.Target == nullptr)
     {
         if (bKnockbackActive)
         {
-            UpdateGroundedVertical(DeltaTime);
+            MovementComp->UpdateGroundedVertical(DeltaTime);
         }
         else
         {
             // UpdateKnockback() zeroed the velocity, so the monster goes back to sleep here.
             RefreshTickState();
         }
+
+        MovementComp->PublishFrameVelocity(DeltaTime);
         return;
     }
 
@@ -104,7 +100,7 @@ void ANYMonsterBase::Tick(float DeltaTime)
         const bool bWithinAttackRange = ToTarget.SizeSquared2D() <= FMath::Square(AttackRange);
         if (!IsAttacking() && !bWithinAttackRange && !Direction.IsNearlyZero())
         {
-            MoveHorizontal(Direction * RandomizedMoveSpeed * DeltaTime);
+            MovementComp->MoveHorizontal(Direction * RandomizedMoveSpeed * DeltaTime);
         }
 
         if (!Direction.IsNearlyZero())
@@ -114,7 +110,8 @@ void ANYMonsterBase::Tick(float DeltaTime)
         }
     }
 
-    UpdateGroundedVertical(DeltaTime);
+    MovementComp->UpdateGroundedVertical(DeltaTime);
+    MovementComp->PublishFrameVelocity(DeltaTime);
 }
 
 void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -151,156 +148,13 @@ bool ANYMonsterBase::ShouldTick() const
     }
 
     // Seeking runs per frame. An idle monster only wakes up for the length of a knockback slide.
-    return ActivationData.Target != nullptr || !KnockbackVelocity.IsNearlyZero();
+    return ActivationData.Target != nullptr || (MovementComp && MovementComp->HasActiveKnockback());
 }
 
 void ANYMonsterBase::RefreshTickState()
 {
     SetActorTickEnabled(ShouldTick());
 }
-
-bool ANYMonsterBase::TryFindFloorZ(const FVector& Location, float& OutCapsuleCenterZ) const
-{
-    const UWorld* World = GetWorld();
-    if (!World || !CapsuleComp)
-    {
-        return false;
-    }
-
-    const FVector TraceStart(Location.X, Location.Y, Location.Z + FloorTraceUpOffset);
-    const FVector TraceEnd(Location.X, Location.Y, Location.Z - FloorTraceDownDistance);
-
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(MonsterFloor), false, this);
-    FHitResult Hit;
-    // ByObjectType(WorldStatic) only, so other monsters/players (unset Visibility response
-    // defaults to Block on their profiles) can never be mistaken for the floor.
-    if (!World->LineTraceSingleByObjectType(Hit, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic), Params))
-    {
-        return false;
-    }
-
-    // +FloorClearance: never let the capsule rest exactly on the surface (see FloorClearance).
-    OutCapsuleCenterZ = Hit.ImpactPoint.Z + CapsuleComp->GetScaledCapsuleHalfHeight() + FloorClearance;
-    return true;
-}
-
-FVector ANYMonsterBase::SnapLocationToFloor(const FVector& Location) const
-{
-    float FloorCapsuleZ = Location.Z;
-    if (TryFindFloorZ(Location, FloorCapsuleZ))
-    {
-        return FVector(Location.X, Location.Y, FloorCapsuleZ);
-    }
-
-    return Location;
-}
-
-void ANYMonsterBase::MoveHorizontal(const FVector& Delta)
-{
-    FHitResult Hit;
-    AddActorWorldOffset(Delta, true, &Hit);
-
-    if (!Hit.bBlockingHit)
-    {
-        return;
-    }
-
-    const FVector Remaining = Delta * (1.0f - Hit.Time);
-
-    if (Hit.Normal.Z >= WalkableNormalZ)
-    {
-        // Slope, not a wall (real walls have a near-vertical Normal.Z) — slide the unswept
-        // remainder along the surface instead of stopping dead. No AActor-level movement
-        // component gives us this for free, so it is projected by hand.
-        AddActorWorldOffset(FVector::VectorPlaneProject(Remaining, Hit.Normal), true);
-        return;
-    }
-
-    // Near-vertical face: may be a stair riser rather than a wall. Measure the floor just past
-    // the face and lift exactly that far. Lifting a fixed MaxFloorSnapUp instead would leave the
-    // capsule airborne on shallow steps, and UpdateGroundedVertical would drop it back down —
-    // that round trip is the visible pop when climbing.
-    const FVector StepDirection = Delta.GetSafeNormal2D();
-    if (!CapsuleComp || StepDirection.IsNearlyZero() || Remaining.IsNearlyZero())
-    {
-        return;
-    }
-
-    const FVector Location = GetActorLocation();
-    const float ProbeDistance = CapsuleComp->GetScaledCapsuleRadius() + StepProbeForwardOffset;
-
-    // Probed from a full step above so any tread within MaxFloorSnapUp is inside the trace range.
-    // An overhang there reads as an out-of-range step, which leaves the monster blocked.
-    FVector ProbeLocation = Location + StepDirection * ProbeDistance;
-    ProbeLocation.Z += MaxFloorSnapUp;
-
-    float StepCapsuleZ = 0.0f;
-    if (!TryFindFloorZ(ProbeLocation, StepCapsuleZ))
-    {
-        return;
-    }
-
-    const float StepUpHeight = StepCapsuleZ - Location.Z;
-    if (StepUpHeight <= 0.0f || StepUpHeight > MaxFloorSnapUp)
-    {
-        return;
-    }
-
-    AddActorWorldOffset(FVector(0.0f, 0.0f, StepUpHeight), true);
-
-    // The sweep above may have been cut short by a ceiling, so undo by what actually moved.
-    const float LiftedZ = GetActorLocation().Z;
-
-    FHitResult StepHit;
-    AddActorWorldOffset(Remaining, true, &StepHit);
-
-    if (StepHit.bBlockingHit)
-    {
-        AddActorWorldOffset(FVector(0.0f, 0.0f, Location.Z - LiftedZ), true);
-    }
-}
-
-void ANYMonsterBase::UpdateGroundedVertical(float DeltaTime)
-{
-    const FVector Location = GetActorLocation();
-
-    float FloorCapsuleZ = Location.Z;
-    if (TryFindFloorZ(Location, FloorCapsuleZ))
-    {
-        const float DeltaZ = FloorCapsuleZ - Location.Z;
-
-        // Floor is in range : snap
-        if (DeltaZ <= MaxFloorSnapUp && DeltaZ >= -MaxFloorSnapDown)
-        {
-            if (!FMath::IsNearlyEqual(Location.Z, FloorCapsuleZ, 0.1f))
-            {
-                SetActorLocation(FVector(Location.X, Location.Y, FloorCapsuleZ));
-            }
-            VerticalVelocity = 0.0f;
-            return;
-        }
-
-        // Floor is far below : fall, then catch when the capsule reaches it
-        // this condition is excuted only when end of falling (to stop by destination Z)
-        if (DeltaZ < -MaxFloorSnapDown && Location.Z + VerticalVelocity * DeltaTime <= FloorCapsuleZ)
-        {
-            SetActorLocation(FVector(Location.X, Location.Y, FloorCapsuleZ));
-            VerticalVelocity = 0.0f;
-            return;
-        }
-    }
-
-    VerticalVelocity -= Gravity * DeltaTime;
-    AddActorWorldOffset(FVector(0.0f, 0.0f, VerticalVelocity * DeltaTime), true);
-
-    const FVector FallenLocation = GetActorLocation();
-    if (TryFindFloorZ(FallenLocation, FloorCapsuleZ) && FallenLocation.Z <= FloorCapsuleZ)
-    {
-        SetActorLocation(FVector(FallenLocation.X, FallenLocation.Y, FloorCapsuleZ));
-        VerticalVelocity = 0.0f;
-    }
-}
-
 
 // Stat
 float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -465,7 +319,7 @@ void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
     CurrentHp = MaxHp;
 
     // Server snaps once; clients receive the floored Z via ActivationData.SpawnLocation.
-    const FVector SnappedLocation = SnapLocationToFloor(StartLocation);
+    const FVector SnappedLocation = MovementComp ? MovementComp->SnapLocationToFloor(StartLocation) : StartLocation;
     SetActorLocation(SnappedLocation);
     SetNetDormancy(DORM_Awake);
 
@@ -506,8 +360,8 @@ void ANYMonsterBase::OnRep_ActivationData()
     if (ActivationData.bIsActive)
     {
         // Apply authoritative spawn position on clients (movement is not replicated).
+        // ClearHitState() below drops the motion left over from the previous life.
         SetActorLocation(ActivationData.SpawnLocation);
-        VerticalVelocity = 0.0f;
 
         SetActorHiddenInGame(false);
         SetActorEnableCollision(true);
@@ -578,43 +432,25 @@ void ANYMonsterBase::BeginKnockback()
     // The attacker is not replicated, but the chase target is. In a top-down horde the
     // player being chased is almost always the one landing the hit, so push away from them.
     const AActor* Target = ActivationData.Target;
-    if (!Target)
+    if (!Target || !MovementComp)
     {
         return;
     }
 
-    const FVector Away = (GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D();
-    KnockbackVelocity = Away * KnockbackSpeed;
+    MovementComp->BeginKnockback(Target->GetActorLocation());
 
     // An idle monster has its tick off; the slide needs it back for a moment.
     RefreshTickState();
 }
 
-bool ANYMonsterBase::UpdateKnockback(float DeltaTime)
-{
-    if (KnockbackVelocity.IsNearlyZero())
-    {
-        return false;
-    }
-
-    AddActorWorldOffset(KnockbackVelocity * DeltaTime, true);
-    KnockbackVelocity = FMath::VInterpTo(KnockbackVelocity, FVector::ZeroVector, DeltaTime, KnockbackDamping);
-
-    // Stop chasing an ever-smaller remainder.
-    if (KnockbackVelocity.SizeSquared() < FMath::Square(KnockbackRestSpeed))
-    {
-        KnockbackVelocity = FVector::ZeroVector;
-        return false;
-    }
-
-    return true;
-}
-
 void ANYMonsterBase::ClearHitState()
 {
     StaggerEndTime = 0.0f;
-    KnockbackVelocity = FVector::ZeroVector;
-    VerticalVelocity = 0.0f;
+
+    if (MovementComp)
+    {
+        MovementComp->ResetMotion();
+    }
 }
 
 // Attack

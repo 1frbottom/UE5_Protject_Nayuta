@@ -12,6 +12,7 @@ class UCapsuleComponent;
 class USkeletalMeshComponent;
 class UWidgetComponent;
 class UNYHpBarWidgetMonster;
+class UNYMonsterMovementComponent;
 class UAnimMontage;
 class INYMonsterLifecycleInterface;
 
@@ -69,6 +70,10 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<class UStaticMeshComponent> SphereComp;
 
+    /** Owns floor following, gravity, step-up and knockback. Driven from this actor's Tick. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
+    TObjectPtr<UNYMonsterMovementComponent> MovementComp;
+
 
 // Tick
 protected:
@@ -84,72 +89,6 @@ protected:
      * the tick on (an idle horde burning frames) or off (a monster frozen mid-chase).
      */
     void RefreshTickState();
-
-
-// Movement
-protected:
-    /** Downward acceleration (cm/s^2) while no floor is within snap range. */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float Gravity = 980.0f;
-
-    /** Starts the floor probe this far above the capsule center so slopes/steps are not missed. */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float FloorTraceUpOffset = 50.0f;
-
-    /** How far below the capsule center the floor probe searches. */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float FloorTraceDownDistance = 1000.0f;
-
-    /**
-     * Max upward Z correction per update, and the tallest step MoveHorizontal will climb when a
-     * near-vertical hit might be a stair riser. Beyond this the probe/step is ignored.
-     */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float MaxFloorSnapUp = 100.0f;
-
-    /**
-     * Max downward Z stick while walking. Farther drops use gravity instead of teleporting
-     * to the valley floor.
-     */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float MaxFloorSnapDown = 100.0f;
-
-    /**
-     * Minimum surface Normal.Z to treat a blocked sweep as walkable terrain to slide along
-     * rather than a wall to stop at. ~0.7 matches CMC's default ~44-degree walkable angle.
-     */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float WalkableNormalZ = 0.7f;
-
-    /**
-     * Kept hovering this far above the floor surface (never touching it exactly). Without this,
-     * the capsule starts every horizontal sweep already in contact with the ground, and UE
-     * reports that as an immediate blocking hit — freezing movement even on flat terrain.
-     */
-    UPROPERTY(EditAnywhere, Category = "Movement")
-    float FloorClearance = 2.0f;
-
-private:
-    /**
-     * Line-traces for WorldStatic under Location (capsule center).
-     * On hit, OutCapsuleCenterZ is ImpactPoint.Z + scaled half-height.
-     */
-    bool TryFindFloorZ(const FVector& Location, float& OutCapsuleCenterZ) const;
-
-    /** Spawn/activate helper: snaps Z to floor when a hit exists, otherwise leaves Location. */
-    FVector SnapLocationToFloor(const FVector& Location) const;
-
-    /**
-     * Sweeps Delta; on a blocking hit against a walkable slope (see WalkableNormalZ), slides the
-     * remainder along the surface instead of stopping dead, so real walls still block movement.
-     * A near-vertical hit is climbed only by the measured step height, up to MaxFloorSnapUp.
-     */
-    void MoveHorizontal(const FVector& Delta);
-
-    /** Sticks to nearby floor, or applies VerticalVelocity under gravity when unsupported. */
-    void UpdateGroundedVertical(float DeltaTime);
-
-    float VerticalVelocity = 0.0f;
 
 
 // Stat
@@ -318,14 +257,6 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Hit")
     float StaggerDuration = 0.15f;
 
-    /** Initial push speed away from the chase target, in cm/s. Zero disables knockback. */
-    UPROPERTY(EditAnywhere, Category = "Hit")
-    float KnockbackSpeed = 400.0f;
-
-    /** Higher values bleed the knockback off faster. */
-    UPROPERTY(EditAnywhere, Category = "Hit")
-    float KnockbackDamping = 8.0f;
-
 private:
     /**
      * Suppresses seek and attacks for StaggerDuration. Together with BeginKnockback() this is
@@ -337,15 +268,10 @@ private:
     /** Pushes the monster away from its chase target. No-op without a target. */
     void BeginKnockback();
 
-    /** Advances the knockback slide. Returns true while it is still moving the monster. */
-    bool UpdateKnockback(float DeltaTime);
-
     /** Clears stagger and knockback so a pooled monster never inherits the previous life's state. */
     void ClearHitState();
 
     float StaggerEndTime = 0.0f;
-
-    FVector KnockbackVelocity = FVector::ZeroVector;
 
     /** Locally cached HP so OnRep_CurrentHp can tell a hit apart from a pool refill. */
     float LastObservedHp = 0.0f;
