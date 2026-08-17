@@ -12,11 +12,6 @@ void UNYMonsterAnimInstance::NativeInitializeAnimation()
 	Super::NativeInitializeAnimation();
 
 	OwningMonster = Cast<ANYMonsterBase>(TryGetPawnOwner());
-
-	if (OwningMonster)
-	{
-		PreviousLocation = OwningMonster->GetActorLocation();
-	}
 }
 
 void UNYMonsterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
@@ -31,23 +26,12 @@ void UNYMonsterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		{
 			return;
 		}
-
-		PreviousLocation = OwningMonster->GetActorLocation();
 	}
 
-	const FVector CurrentLocation = OwningMonster->GetActorLocation();
-
-	if (DeltaSeconds > 0.0f)
-	{
-		const float FrameDistance = FVector::Dist2D(CurrentLocation, PreviousLocation);
-		const float MaxFrameDistance = MaxTrackedSpeed * DeltaSeconds;
-
-		// 1. Speed
-		// Pool activation snaps the actor to a spawn point; that jump is not locomotion.
-		GroundSpeed = (FrameDistance > MaxFrameDistance) ? 0.0f : FrameDistance / DeltaSeconds;
-	}
-
-	PreviousLocation = CurrentLocation;
+	// 1. Speed
+	// UNYMonsterMovementComponent publishes only swept distance, so pool activation snaps
+	// (which move the actor directly) never register as locomotion.
+	GroundSpeed = OwningMonster->GetVelocity().Size2D();
 
 	// 2. Moving
 	bIsMoving = GroundSpeed > MovingSpeedThreshold;

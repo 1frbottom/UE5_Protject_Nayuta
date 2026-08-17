@@ -33,7 +33,7 @@ protected:
 
 // Locomotion
 protected:
-	/** Horizontal speed derived from actor location delta; APawn::GetVelocity() is zero without a movement component. */
+	/** Horizontal speed from APawn::GetVelocity(), fed by UNYMonsterMovementComponent. */
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Locomotion")
 	float GroundSpeed = 0.0f;
 
@@ -43,17 +43,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Locomotion")
 	float MovingSpeedThreshold = 3.0f;
 
-	/** Location deltas implying more than this speed are treated as pool teleports, not movement. */
-	UPROPERTY(EditDefaultsOnly, Category = "Locomotion")
-	float MaxTrackedSpeed = 1000.0f;
-
 
 // State
 protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "State")
 	bool bIsDead = false;
-
-private:
-	FVector PreviousLocation = FVector::ZeroVector;
 
 };
