@@ -46,6 +46,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Wave")
 	TObjectPtr<UDataTable> WaveDataTable;
 
+	/** Seconds of empty field after target kill count before reward phase. */
+	UPROPERTY(EditDefaultsOnly, Category = "Wave", meta = (ClampMin = "0.0"))
+	float WaveClearDelay = 2.0f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Data")
 	TObjectPtr<UDataTable> PlayerLevelDataTable;
 
@@ -85,6 +89,14 @@ protected:
 	void TryStartFirstWave();
 	void GameOver();
 	void GameClear();
+
+	/** Server: stop spawns, clear the field, then enter reward phase after WaveClearDelay. */
+	void TryScheduleRewardPhase();
+
+	/** Server: return every active monster to the pool (destroy if no pool). */
+	void ClearActiveMonsters();
+
+	FTimerHandle WaveClearDelayHandle;
 
 	/** PlayerArray queries — single source of truth instead of manual ++/-- counters. */
 	int32 CountPlayersWithPawn() const;

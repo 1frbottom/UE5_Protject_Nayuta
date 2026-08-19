@@ -31,9 +31,13 @@ void ANYGameModeStage::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	// HandleStartingNewPlayer can start the first wave before GameMode BeginPlay.
+	if (CurrWave == 0)
 	{
-		GS->SetGamePhase(ENYGamePhase::Waiting);
+		if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+		{
+			GS->SetGamePhase(ENYGamePhase::Waiting);
+		}
 	}
 
 	// First wave starts in TryStartFirstWave() after all connected players have pawns.
@@ -235,6 +239,8 @@ void ANYGameModeStage::TryStartFirstWave()
 
 void ANYGameModeStage::GameOver()
 {
+	GetWorldTimerManager().ClearTimer(WaveClearDelayHandle);
+
 	// update Game Phase 
 	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
 	if (GS)
@@ -253,6 +259,8 @@ void ANYGameModeStage::GameClear()
 		return;
 	}
 
+	GetWorldTimerManager().ClearTimer(WaveClearDelayHandle);
+
 	SetSpawnersActive(false);
 
 	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
@@ -260,6 +268,64 @@ void ANYGameModeStage::GameClear()
 	{
 		GS->ReplicatedClearedWaveCount = FMath::Max(0, CurrWave - 1);
 		GS->SetGamePhase(ENYGamePhase::GameClear);
+	}
+}
+
+void ANYGameModeStage::TryScheduleRewardPhase()
+{
+	// Server
+	if (CurrKillCnt < TargetKillCnt)
+	{
+		return;
+	}
+
+	if (GetWorldTimerManager().IsTimerActive(WaveClearDelayHandle))
+	{
+		return;
+	}
+
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		const ENYGamePhase Phase = GS->GetGamePhase();
+		if (Phase == ENYGamePhase::Rewarding || 
+			Phase == ENYGamePhase::GameOver || 
+			Phase == ENYGamePhase::GameClear)
+		{
+			return;
+		}
+	}
+
+	SetSpawnersActive(false);
+	ClearActiveMonsters();
+
+	if (WaveClearDelay <= 0.0f)
+	{
+		StartRewardPhase();
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		WaveClearDelayHandle,
+		this,
+		&ANYGameModeStage::StartRewardPhase,
+		WaveClearDelay,
+		false);
+}
+
+void ANYGameModeStage::ClearActiveMonsters()
+{
+	TArray<AActor*> AliveMonsters;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANYMonsterBase::StaticClass(), AliveMonsters);
+
+	for (AActor* Actor : AliveMonsters)
+	{
+		if (ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Actor))
+		{
+			if (!ReclaimMonster(Monster))
+			{
+				Monster->Destroy();
+			}
+		}
 	}
 }
 
@@ -331,18 +397,21 @@ void ANYGameModeStage::TryAdvanceWaveAfterRewards()
 
 void ANYGameModeStage::StartRewardPhase()
 {
-	SetSpawnersActive(false);
+	GetWorldTimerManager().ClearTimer(WaveClearDelayHandle);
 
-	// Return all active monsters to the pool (fallback: destroy if pool missing).
-	TArray<AActor*> AliveMonsters;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANYMonsterBase::StaticClass(), AliveMonsters);
-
-	for (AActor* Actor : AliveMonsters)
-		if (ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Actor))
+	if (ANYGameStateStage* GS = GetGameState<ANYGameStateStage>())
+	{
+		const ENYGamePhase Phase = GS->GetGamePhase();
+		if (Phase == ENYGamePhase::Rewarding || 
+			Phase == ENYGamePhase::GameOver || 
+			Phase == ENYGamePhase::GameClear)
 		{
-			if (!ReclaimMonster(Monster))
-				Monster->Destroy();
+			return;
 		}
+	}
+
+	SetSpawnersActive(false);
+	ClearActiveMonsters();
 
 	ANYGameStateStage* GS = GetGameState<ANYGameStateStage>();
 	if (!GS)
@@ -860,7 +929,7 @@ void ANYGameModeStage::NotifyMonsterKilled(AController* KillerController, ANYMon
 
 	if (CurrKillCnt >= TargetKillCnt)
 	{
-		StartRewardPhase();
+		TryScheduleRewardPhase();
 	}
 }
 
