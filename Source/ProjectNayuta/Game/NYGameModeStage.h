@@ -6,9 +6,9 @@
 #include "Game/NYGameModeBase.h"
 #include "Engine/DataTable.h"
 
-#include "Game/NYStageDataRows.h"
-#include "Game/NYRewardTypes.h"
-#include "Game/NYMonsterLifecycleInterface.h"
+#include "Data/NYStageDataRows.h"
+#include "Data/NYRewardTypes.h"
+#include "Monsters/NYMonsterLifecycleInterface.h"
 #include "Player/NYPlayerStateStage.h"
 
 #include "NYGameModeStage.generated.h"

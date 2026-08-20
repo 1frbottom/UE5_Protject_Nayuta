@@ -9,10 +9,10 @@
 #include "Player/NYPlayerStateStage.h"
 
 #include "Game/NYGameStateStage.h"
-#include "Game/NYMonsterSpawnComponent.h"
-#include "Game/NYMonsterPoolComponent.h"
-#include "Game/NYStageContentRegistry.h"
-#include "Game/NYRewardTypes.h"
+#include "Monsters/NYMonsterSpawnComponent.h"
+#include "Monsters/NYMonsterPoolComponent.h"
+#include "Data/NYStageContentRegistry.h"
+#include "Data/NYRewardTypes.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 #include "Characters/CharacterPlayers/NYCharacterPlayer.h"

@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Game/NYMonsterSpawner.h"
+#include "Monsters/NYMonsterSpawner.h"
 
-#include "Game/NYMonsterSpawnComponent.h"
+#include "Monsters/NYMonsterSpawnComponent.h"
 
 ANYMonsterSpawner::ANYMonsterSpawner()
 {

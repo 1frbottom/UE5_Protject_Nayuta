@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Player/NYPlayerStateBase.h"
-#include "Game/NYRewardTypes.h"
+#include "Data/NYRewardTypes.h"
 #include "NYPlayerStateStage.generated.h"
 
 

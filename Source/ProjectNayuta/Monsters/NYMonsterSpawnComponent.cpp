@@ -1,13 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Game/NYMonsterSpawnComponent.h"
+#include "Monsters/NYMonsterSpawnComponent.h"
 
 #include "Math/UnrealMathUtility.h"
 #include "NavigationSystem.h"
 
 #include "Game/NYGameModeStage.h"
 #include "Game/NYGameStateBase.h"
-#include "Game/NYMonsterPoolComponent.h"
+#include "Monsters/NYMonsterPoolComponent.h"
 
 #include "Player/NYPlayerStateStage.h"
 

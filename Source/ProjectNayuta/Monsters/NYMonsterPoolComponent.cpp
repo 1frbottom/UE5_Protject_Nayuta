@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Game/NYMonsterPoolComponent.h"
+#include "Monsters/NYMonsterPoolComponent.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 

@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/NYGameModeBase.h"
-#include "Game/NYMonsterLifecycleInterface.h"
+#include "Monsters/NYMonsterLifecycleInterface.h"
 #include "NYGameModeTraining.generated.h"
 
 

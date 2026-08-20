@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Game/NYStageContentRegistry.h"
+#include "Data/NYStageContentRegistry.h"
 
-#include "Game/NYMonsterDefinition.h"
+#include "Monsters/NYMonsterDefinition.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
 
 const UNYMonsterDefinition* UNYStageContentRegistry::FindMonsterDefinition(FName MonsterType) const

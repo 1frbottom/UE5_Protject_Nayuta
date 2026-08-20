@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Game/NYStageDataRows.h"
+#include "Data/NYStageDataRows.h"
 
 class UDataTable;
 

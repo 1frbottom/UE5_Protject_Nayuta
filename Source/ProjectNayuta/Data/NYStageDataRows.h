@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 
-#include "Game/NYRewardTypes.h"
+#include "Data/NYRewardTypes.h"
 
 #include "NYStageDataRows.generated.h"
 

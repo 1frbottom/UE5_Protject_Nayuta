@@ -1,3 +1,3 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Game/NYMonsterLifecycleInterface.h"
+#include "Monsters/NYMonsterDefinition.h"

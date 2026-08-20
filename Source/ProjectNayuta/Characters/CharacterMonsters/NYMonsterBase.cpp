@@ -15,7 +15,7 @@
 #include "Net/UnrealNetwork.h"
 
 #include "Characters/CharacterMonsters/NYMonsterMovementComponent.h"
-#include "Game/NYMonsterLifecycleInterface.h"
+#include "Monsters/NYMonsterLifecycleInterface.h"
 
 
 
