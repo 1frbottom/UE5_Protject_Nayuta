@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Player/NYPlayerControllerBase.h"
+#include "Player/NYPlayerControllerInGame.h"
 #include "Game/NYGameModeTraining.h"
 #include "NYPlayerControllerTraining.generated.h"
 
@@ -16,7 +16,7 @@ class UUserWidget;
  * Training-room PC: sandbox combat + training panel. Keeps Stage PC free of debug UI.
  */
 UCLASS()
-class PROJECTNAYUTA_API ANYPlayerControllerTraining : public ANYPlayerControllerBase
+class PROJECTNAYUTA_API ANYPlayerControllerTraining : public ANYPlayerControllerInGame
 {
 	GENERATED_BODY()
 

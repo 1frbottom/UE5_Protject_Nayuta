@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 
 #include "Game/NYGameModeStage.h"
+#include "Player/NYPlayerControllerInGame.h"
 #include "Player/NYPlayerControllerStage.h"
 #include "Characters/CharacterPlayers/NYCharacterPlayer.h"
 #include "Weapons/NYWeaponComponent.h"
@@ -306,28 +307,14 @@ void ANYPlayerStateStage::AddMaxHp(float InAmount)
 
 void ANYPlayerStateStage::OnRep_CurrHp()
 {
-    // for party hpbar ui
-    if (ANYPlayerControllerStage* LocalPC = Cast<ANYPlayerControllerStage>(GetWorld()->GetFirstPlayerController()))
+    ANYPlayerControllerInGame* OwnerPC = Cast<ANYPlayerControllerInGame>(GetPlayerController());
+    if (!OwnerPC || !OwnerPC->IsLocalPlayerController())
     {
-        float HpPercent = (MaxHP > 0.0f) ? (CurrHp / MaxHP) : 0.0f;
-
-        // If it's my PC, update my Hpbar
-        if (LocalPC->PlayerState == this)
-        {
-            LocalPC->UpdatePlayerHpUI(HpPercent);
-        }
-        else
-        {
-
-
-        }
-
-        // debug
-        //GEngine->AddOnScreenDebugMessage(
-        //    -1, 5.f, FColor::Cyan,
-        //    FString::Printf(TEXT("MaxHp : %f, CurrHp : %f"), MaxHP, CurrHp)
-        //);
+        return;
     }
+
+    const float HpPercent = (MaxHP > 0.0f) ? (CurrHp / MaxHP) : 0.0f;
+    OwnerPC->UpdatePlayerHpUI(HpPercent);
 }
 
 

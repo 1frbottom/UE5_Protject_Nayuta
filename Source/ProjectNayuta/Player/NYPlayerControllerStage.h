@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Player/NYPlayerControllerBase.h"
+#include "Player/NYPlayerControllerInGame.h"
 #include "Game/NYRewardTypes.h"
 #include "NYPlayerControllerStage.generated.h"
 
@@ -20,7 +20,7 @@ enum class ENYInputConfig : uint8
 };
 
 UCLASS()
-class PROJECTNAYUTA_API ANYPlayerControllerStage : public ANYPlayerControllerBase
+class PROJECTNAYUTA_API ANYPlayerControllerStage : public ANYPlayerControllerInGame
 {
 	GENERATED_BODY()
 
@@ -35,10 +35,6 @@ public:
     // Phase
     UFUNCTION(BlueprintCallable, Category = "UI")
     void HandleGamePhaseChanged(ENYGamePhase NewPhase);
-
-    // Hp
-    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
-    void UpdatePlayerHpUI(float HpPercentage);
 
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdateExpUI(int32 CurrentExp, int32 MaxExpValue, int32 PlayerLevel);

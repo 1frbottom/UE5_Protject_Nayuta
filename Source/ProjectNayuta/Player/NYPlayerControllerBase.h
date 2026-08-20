@@ -6,10 +6,6 @@
 #include "GameFramework/PlayerController.h"
 #include "NYPlayerControllerBase.generated.h"
 
-/**
- * 
- */
-
 class UUserWidget;
 
 UCLASS()
