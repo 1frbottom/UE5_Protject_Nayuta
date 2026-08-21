@@ -192,6 +192,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Attack")
     TArray<TObjectPtr<UAnimMontage>> AttackMontages;
 
+    /**
+     * Named notify on the attack montage for the hit/release frame.
+     * Server reads the time from the asset and delays PerformAttack(); the notify itself must not spawn.
+     * Missing notify = PerformAttack at montage start.
+     */
+    UPROPERTY(EditDefaultsOnly, Category = "Attack")
+    FName AttackCommitNotifyName = TEXT("AttackCommit");
+
     /** Freeze duration used when no montage is assigned for the chosen attack. */
     UPROPERTY(EditAnywhere, Category = "Attack")
     float AttackFreezeDuration = 0.3f;
@@ -205,8 +213,19 @@ protected:
 private:
     FTimerHandle AttackTimerHandle;
 
-    /** Server-only. Bound to AttackTimerHandle; gates PerformAttack behind CanAttack. */
+    /** Server-only. One-shot delay from montage start to AttackCommitNotifyName. */
+    FTimerHandle AttackCommitTimerHandle;
+
+    /** Server-only. Bound to AttackTimerHandle; starts the montage then schedules CommitAttackOnServer. */
     void ProcessAttack();
+
+    /** Server-only. Runs PerformAttack after the commit delay (or immediately when no notify exists). */
+    void CommitAttackOnServer();
+
+    void ClearAttackTimers();
+
+    /** Seconds from montage start to NotifyName. 0 if the montage or notify is missing. */
+    static float GetAttackCommitDelay(const UAnimMontage* Montage, FName NotifyName);
 
     /**
      * NetMulticast, Reliable. Runs on every machine (including the server) so the local seek

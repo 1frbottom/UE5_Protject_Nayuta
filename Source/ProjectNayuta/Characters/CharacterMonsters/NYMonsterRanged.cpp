@@ -27,7 +27,7 @@ void ANYMonsterRanged::BeginPlay()
 // Attack
 void ANYMonsterRanged::PerformAttack()
 {
-	// Server-only: base's ProcessAttack only calls this after CanAttack() (target, stagger, range).
+	// Server-only: CommitAttackOnServer after AttackCommit notify (or immediately if the montage has none).
 	FireProjectile();
 }
 

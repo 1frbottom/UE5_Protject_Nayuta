@@ -29,6 +29,6 @@ void ANYMonsterMelee::BeginPlay()
 // Attack
 void ANYMonsterMelee::PerformAttack()
 {
-	// Server-only: base's ProcessAttack only calls this after CanAttack() (target, stagger, range).
+	// Server-only: CommitAttackOnServer after AttackCommit notify (or immediately if the montage has none).
 	UGameplayStatics::ApplyDamage(ActivationData.Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
 }

@@ -5,8 +5,11 @@
 
 #include "ProjectNayuta.h"
 
+#include "Animation/AnimCompositeBase.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/AnimTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -274,8 +277,8 @@ void ANYMonsterBase::StartDeathOnServer(AController* KillerController)
 
 void ANYMonsterBase::StopAttackOnServer()
 {
-    // Server-only: OnRep_ActivationData only ever sets this timer under HasAuthority().
-    GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+    // Server-only: OnRep_ActivationData only ever sets these timers under HasAuthority().
+    ClearAttackTimers();
 }
 
 void ANYMonsterBase::FinishDeathOnServer()
@@ -399,12 +402,13 @@ void ANYMonsterBase::OnRep_ActivationData()
         // Server: only the authority ever ticks its own attack timer.
         if (HasAuthority())
         {
+            GetWorldTimerManager().ClearTimer(AttackCommitTimerHandle);
             GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterBase::ProcessAttack, FMath::Max(AttackInterval, 0.01f), true);
         }
     }
     else
     {
-        GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+        ClearAttackTimers();
     }
 
     // Last, so ShouldTick() reads the state both branches above have finished settling.
@@ -424,6 +428,11 @@ void ANYMonsterBase::BeginStagger()
     if (const UWorld* World = GetWorld())
     {
         StaggerEndTime = World->GetTimeSeconds() + StaggerDuration;
+    }
+
+    if (HasAuthority())
+    {
+        GetWorldTimerManager().ClearTimer(AttackCommitTimerHandle);
     }
 }
 
@@ -472,16 +481,90 @@ bool ANYMonsterBase::CanAttack() const
 
 void ANYMonsterBase::ProcessAttack()
 {
-    if (CanAttack())
+    if (!CanAttack())
     {
-        PerformAttack();
-
-        UAnimMontage* ChosenMontage = AttackMontages.Num() > 0
-            ? AttackMontages[FMath::RandRange(0, AttackMontages.Num() - 1)]
-            : nullptr;
-
-        Multicast_OnAttackStarted(ChosenMontage);
+        return;
     }
+
+    UAnimMontage* ChosenMontage = AttackMontages.Num() > 0
+        ? AttackMontages[FMath::RandRange(0, AttackMontages.Num() - 1)]
+        : nullptr;
+
+    Multicast_OnAttackStarted(ChosenMontage);
+
+    const float CommitDelay = GetAttackCommitDelay(ChosenMontage, AttackCommitNotifyName);
+    if (CommitDelay > 0.0f)
+    {
+        GetWorldTimerManager().SetTimer(
+            AttackCommitTimerHandle,
+            this,
+            &ANYMonsterBase::CommitAttackOnServer,
+            CommitDelay,
+            false);
+    }
+    else
+    {
+        CommitAttackOnServer();
+    }
+}
+
+void ANYMonsterBase::CommitAttackOnServer()
+{
+    // Server: windup finished. Skip if the monster died, pooled, or lost its target during the delay.
+    if (!HasAuthority() || CurrentHp <= 0.0f || !ActivationData.bIsActive || ActivationData.Target == nullptr)
+    {
+        return;
+    }
+
+    PerformAttack();
+}
+
+void ANYMonsterBase::ClearAttackTimers()
+{
+    GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+    GetWorldTimerManager().ClearTimer(AttackCommitTimerHandle);
+}
+
+float ANYMonsterBase::GetAttackCommitDelay(const UAnimMontage* Montage, FName NotifyName)
+{
+    if (!Montage || NotifyName.IsNone())
+    {
+        return 0.0f;
+    }
+
+    for (const FAnimNotifyEvent& Event : Montage->Notifies)
+    {
+        if (Event.NotifyName == NotifyName)
+        {
+            return FMath::Max(Event.GetTriggerTime(), 0.0f);
+        }
+    }
+
+    for (const FSlotAnimationTrack& SlotTrack : Montage->SlotAnimTracks)
+    {
+        for (const FAnimSegment& Segment : SlotTrack.AnimTrack.AnimSegments)
+        {
+            const UAnimSequenceBase* Sequence = Segment.GetAnimReference();
+            if (!Sequence)
+            {
+                continue;
+            }
+
+            for (const FAnimNotifyEvent& Event : Sequence->Notifies)
+            {
+                if (Event.NotifyName != NotifyName)
+                {
+                    continue;
+                }
+
+                const float MontageTime = Segment.StartPos
+                    + (Event.GetTriggerTime() - Segment.AnimStartTime) / Segment.GetValidPlayRate();
+                return FMath::Max(MontageTime, 0.0f);
+            }
+        }
+    }
+
+    return 0.0f;
 }
 
 bool ANYMonsterBase::IsAttacking() const
