@@ -161,8 +161,6 @@ void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 
 void ANYGameModeStage::StartNextWave()
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("StartNextWave called! wave : %d"), CurrWave + 1));
-
 	CurrWave++;
 	CurrKillCnt = 0;
 

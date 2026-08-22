@@ -112,11 +112,11 @@ public:
 protected:
 	UPROPERTY(Replicated, EditAnywhere, Category = "Stat")
 	//float MaxHP = 100.0f;
-	float MaxHP = 10000.0f;
+	float MaxHP = 1000.0f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrHp, EditAnywhere, Category = "Stat")
 	//float CurrHp = 100.0f;
-	float CurrHp = 10000.0f;
+	float CurrHp = 1000.0f;
 
 	UFUNCTION()
 	void OnRep_CurrHp();

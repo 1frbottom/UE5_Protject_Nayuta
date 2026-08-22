@@ -29,6 +29,9 @@
 #include "Weapons/NYWeaponComponent.h"
 #include "Weapons/NYWeaponDefinition.h"
 
+#include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+
 
 
 ANYCharacterPlayer::ANYCharacterPlayer()
@@ -54,7 +57,7 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
 
         // test
-    GetCharacterMovement()->JumpZVelocity = 1000.f;
+    GetCharacterMovement()->JumpZVelocity = 300.f;
 
     // Stat
 
@@ -314,27 +317,30 @@ float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 
 void ANYCharacterPlayer::Die()
 {
-    // prevent falling down
-    GetCharacterMovement()->DisableMovement();
+    bIsDead = true;
 
-    // Capule No Collision
+    GetCharacterMovement()->DisableMovement();
+    GetCharacterMovement()->StopMovementImmediately();
+
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // Body remains?
-
-    // dead animation
-
-
+    // Attack montages occupy the slot until stopped; AnimGraph death waits otherwise.
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.15f);
+        }
+    }
 }
 
 void ANYCharacterPlayer::Revive()
 {
+    bIsDead = false;
+
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
-    // stop dead animation?
-
 }
 
 void ANYCharacterPlayer::ResolveMonsterSoftCollision()

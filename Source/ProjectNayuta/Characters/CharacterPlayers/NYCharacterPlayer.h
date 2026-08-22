@@ -106,8 +106,13 @@ public:
 
 	void Die();
 	void Revive();
+	FORCEINLINE bool IsDead() const { return bIsDead; }
 
 protected:
+	/** Local presentation flag. Die/Revive already run on every machine via PlayerState phase. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Stat")
+	bool bIsDead = false;
+
 	/** Push player and nearby monsters apart when capsules overlap (requires Player-Monster Overlap in collision presets). */
 	void ResolveMonsterSoftCollision();
 
@@ -126,8 +131,6 @@ protected:
 	/** Cap total player displacement per frame to avoid spikes when many monsters overlap. */
 	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
 	float MaxPlayerSeparationPerTick = 8.0f;
-
-
 
 // Weapon
 public:
