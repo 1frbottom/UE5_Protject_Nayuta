@@ -52,12 +52,13 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     GetCapsuleComponent()->SetCollisionProfileName(PROFILE_PLAYER);
 
     // Movement
-    bUseControllerRotationYaw = false;
-    GetCharacterMovement()->bOrientRotationToMovement = true;
+    // Face control yaw so AnimBP Direction can drive strafe/back blend-space clips.
+    bUseControllerRotationYaw = true;
+    GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
 
         // test
-    GetCharacterMovement()->JumpZVelocity = 300.f;
+    GetCharacterMovement()->JumpZVelocity = 700.f;
 
     // Stat
 
@@ -312,6 +313,17 @@ float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 
     PS_ref->ApplyDamage(DamageAmount);
 
+    if (PS_ref->GetPlayerPhase() == ENYPlayerPhase::Alive)
+    {
+        const UWorld* World = GetWorld();
+        const float Now = World ? World->GetTimeSeconds() : 0.0f;
+        if (LastHitReactServerTime < 0.0f || Now - LastHitReactServerTime >= HitReactRetriggerDelay)
+        {
+            LastHitReactServerTime = Now;
+            Multicast_OnHitFeedback(DamageAmount);
+        }
+    }
+
     return DamageAmount;
 }
 
@@ -331,6 +343,8 @@ void ANYCharacterPlayer::Die()
         {
             AnimInstance->StopAllMontages(0.15f);
         }
+
+        OnDeathFeedback();
     }
 }
 
@@ -446,8 +460,16 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
     }
 }
 
+void ANYCharacterPlayer::Multicast_OnHitFeedback_Implementation(float DamageTaken)
+{
+    if (GetNetMode() == NM_DedicatedServer || bIsDead)
+    {
+        return;
+    }
 
-// Weapon
+    OnHitFeedback(DamageTaken);
+}
+
 void ANYCharacterPlayer::ResetWeaponForNewRun()
 {
     if (DefaultWeaponComp)

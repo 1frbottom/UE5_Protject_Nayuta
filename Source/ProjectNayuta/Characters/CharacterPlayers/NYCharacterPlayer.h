@@ -132,6 +132,35 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
 	float MaxPlayerSeparationPerTick = 8.0f;
 
+// Hit
+protected:
+	/**
+	 * Presentation only (montage, SFX, flash), authored in Character Blueprint.
+	 * Fires on every machine that renders this pawn, never on a dedicated server.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Hit")
+	void OnHitFeedback(float DamageTaken);
+
+	/** Server: notify all machines a non-lethal hit landed. */
+	UFUNCTION(NetMulticast, Unreliable, Category = "Hit")
+	void Multicast_OnHitFeedback(float DamageTaken);
+
+	/** Server: minimum seconds between hit-react multicasts. */
+	UPROPERTY(EditDefaultsOnly, Category = "Hit")
+	float HitReactRetriggerDelay = 0.35f;
+
+private:
+	float LastHitReactServerTime = -1.0f;
+
+// Death
+protected:
+	/**
+	 * Presentation only (montage, SFX, flash), authored in Character Blueprint.
+	 * Fires on every machine that renders this pawn, never on a dedicated server.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Death")
+	void OnDeathFeedback();
+
 // Weapon
 public:
 	FORCEINLINE UNYWeaponComponent* GetWeaponComponent() const { return DefaultWeaponComp; }
