@@ -85,6 +85,9 @@ public:
 	void OnPlayerDied(ANYPlayerControllerStage* PC_victim);
 
 protected:
+	/** Server: send every monster chasing OldTarget to another Alive player (or idle). */
+	void RetargetMonstersChasing(AActor* OldTarget);
+
 	void StartNextWave();
 	void TryStartFirstWave();
 	void GameOver();

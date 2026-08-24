@@ -40,7 +40,7 @@ protected:
 	TArray<TObjectPtr<ANYMonsterBase>> InactivePool;
 
 	/** Class last passed to InitializePool. ReturnMonster destroys mismatches instead of pooling them. */
-	UPROPERTY(Transient, Category = "Pool")
+	UPROPERTY(Transient)
 	TSubclassOf<ANYMonsterBase> PooledMonsterClass;
 
 private:

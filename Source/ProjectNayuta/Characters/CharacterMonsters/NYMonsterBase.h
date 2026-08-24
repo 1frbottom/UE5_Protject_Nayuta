@@ -240,6 +240,7 @@ private:
 // Multiplay
 public:
     FORCEINLINE bool IsActive() const { return ActivationData.bIsActive; }
+    FORCEINLINE AActor* GetChaseTarget() const { return ActivationData.Target; }
 
     /**
      * Authority-only: show at StartLocation and chase NewTarget.
@@ -247,6 +248,9 @@ public:
      * seeks or attacks (training sandbox).
      */
     void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
+
+    /** Authority-only: chase a random Alive player, or idle if none remain. */
+    void RetargetOrIdleOnServer();
 
     void DeactivateOnServer();  
 
@@ -256,6 +260,16 @@ protected:
 
     UFUNCTION()
     virtual void OnRep_ActivationData();
+
+    /** True when Target is an Alive player. Dead pawns still exist, so this is not a null check. */
+    static bool IsChaseTargetValid(const AActor* Target);
+
+    /** Attack timer + tick enable from the current Target. Does not snap location. */
+    void ApplyChaseStateFromTarget();
+
+private:
+    /** True after OnRep has applied the active pose; cleared on deactivate so the next life can snap. */
+    bool bHasAppliedActivePose = false;
 
 
 // Hit Reaction

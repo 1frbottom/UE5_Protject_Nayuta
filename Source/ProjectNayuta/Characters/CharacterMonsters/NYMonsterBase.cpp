@@ -15,10 +15,14 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 #include "Characters/CharacterMonsters/NYMonsterMovementComponent.h"
+#include "Characters/CharacterPlayers/NYCharacterPlayer.h"
+#include "Game/NYGameStateBase.h"
 #include "Monsters/NYMonsterLifecycleInterface.h"
+#include "Player/NYPlayerStateStage.h"
 
 
 
@@ -71,8 +75,8 @@ void ANYMonsterBase::Tick(float DeltaTime)
 
     const bool bKnockbackActive = MovementComp->UpdateKnockback(DeltaTime);
 
-    // Idle monsters keep their tick off; a hit turns it back on just long enough to slide.
-    if (ActivationData.Target == nullptr)
+    // Dead/destroyed target: don't walk in. Server retargets from GameMode (death/logout).
+    if (!IsChaseTargetValid(ActivationData.Target))
     {
         if (bKnockbackActive)
         {
@@ -336,6 +340,48 @@ void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
     OnRep_ActivationData();
 }
 
+void ANYMonsterBase::RetargetOrIdleOnServer()
+{
+    if (!HasAuthority() || !ActivationData.bIsActive)
+    {
+        return;
+    }
+
+    TArray<ANYCharacterPlayer*> AlivePlayers;
+    if (const ANYGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState<ANYGameStateBase>() : nullptr)
+    {
+        for (APlayerState* PS : GS->PlayerArray)
+        {
+            const ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS);
+            if (!StagePS || StagePS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+            {
+                continue;
+            }
+
+            if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(StagePS->GetPawn()))
+            {
+                AlivePlayers.Add(Character);
+            }
+        }
+    }
+
+    AActor* NewTarget = AlivePlayers.IsEmpty()
+        ? nullptr
+        : AlivePlayers[FMath::RandRange(0, AlivePlayers.Num() - 1)];
+
+    if (ActivationData.Target == NewTarget)
+    {
+        return;
+    }
+
+    FMonsterActivationData NewData = ActivationData;
+    NewData.Target = NewTarget;
+    ActivationData = NewData;
+
+    ForceNetUpdate();
+    ApplyChaseStateFromTarget();
+}
+
 void ANYMonsterBase::DeactivateOnServer()
 {
     if (!HasAuthority())
@@ -362,27 +408,34 @@ void ANYMonsterBase::OnRep_ActivationData()
 {
     if (ActivationData.bIsActive)
     {
-        // Apply authoritative spawn position on clients (movement is not replicated).
-        // ClearHitState() below drops the motion left over from the previous life.
-        SetActorLocation(ActivationData.SpawnLocation);
+        // Skip the spawn snap when only Target changed; otherwise clients teleport back to spawn.
+        if (!bHasAppliedActivePose)
+        {
+            // Apply authoritative spawn position on clients (movement is not replicated).
+            // ClearHitState() below drops the motion left over from the previous life.
+            SetActorLocation(ActivationData.SpawnLocation);
 
-        SetActorHiddenInGame(false);
-        SetActorEnableCollision(true);
+            SetActorHiddenInGame(false);
+            SetActorEnableCollision(true);
 
-        ClearHitState();
+            ClearHitState();
 
-        // Both values come from the replicated seed, so every machine walks this monster
-        // the same way. The golden ratio keeps the angle from tracking the speed.
-        const float SpeedAlpha = ActivationData.MoveSeed / 255.0f;
-        const float AngleAlpha = FMath::Frac(ActivationData.MoveSeed * 0.6180339887f);
+            // Both values come from the replicated seed, so every machine walks this monster
+            // the same way. The golden ratio keeps the angle from tracking the speed.
+            const float SpeedAlpha = ActivationData.MoveSeed / 255.0f;
+            const float AngleAlpha = FMath::Frac(ActivationData.MoveSeed * 0.6180339887f);
 
-        RandomizedMoveSpeed = MoveSpeed * FMath::Lerp(0.8f, 1.2f, SpeedAlpha);
-        ApproachAngleOffset = FMath::Lerp(-MaxApproachAngleOffset, MaxApproachAngleOffset, AngleAlpha);
+            RandomizedMoveSpeed = MoveSpeed * FMath::Lerp(0.8f, 1.2f, SpeedAlpha);
+            ApproachAngleOffset = FMath::Lerp(-MaxApproachAngleOffset, MaxApproachAngleOffset, AngleAlpha);
 
-        OnRep_CurrentHp();
+            OnRep_CurrentHp();
+            bHasAppliedActivePose = true;
+        }
     }
     else
     {
+        bHasAppliedActivePose = false;
+
         // Pooled reuse: a hit montage left mid-blend would resume on the next activation.
         if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
         {
@@ -395,8 +448,29 @@ void ANYMonsterBase::OnRep_ActivationData()
         SetActorEnableCollision(false);
     }
 
-    // Covers both idle-active (Target null) and deactivated monsters, matching the
-    // bIsActive branches above without duplicating the null check in each of them.
+    ApplyChaseStateFromTarget();
+}
+
+bool ANYMonsterBase::IsChaseTargetValid(const AActor* Target)
+{
+    if (!IsValid(Target))
+    {
+        return false;
+    }
+
+    const ANYCharacterPlayer* Player = Cast<ANYCharacterPlayer>(Target);
+    if (!Player)
+    {
+        return false;
+    }
+
+    const ANYPlayerStateStage* PS = Player->GetPlayerState<ANYPlayerStateStage>();
+    
+    return PS && PS->GetPlayerPhase() == ENYPlayerPhase::Alive;
+}
+
+void ANYMonsterBase::ApplyChaseStateFromTarget()
+{
     if (ActivationData.Target != nullptr)
     {
         // Server: only the authority ever ticks its own attack timer.
@@ -441,7 +515,7 @@ void ANYMonsterBase::BeginKnockback()
     // The attacker is not replicated, but the chase target is. In a top-down horde the
     // player being chased is almost always the one landing the hit, so push away from them.
     const AActor* Target = ActivationData.Target;
-    if (!Target || !MovementComp)
+    if (!IsValid(Target) || !MovementComp)
     {
         return;
     }
@@ -465,7 +539,7 @@ void ANYMonsterBase::ClearHitState()
 // Attack
 bool ANYMonsterBase::CanAttack() const
 {
-    if (ActivationData.Target == nullptr)
+    if (!IsChaseTargetValid(ActivationData.Target))
     {
         return false;
     }
@@ -511,7 +585,7 @@ void ANYMonsterBase::ProcessAttack()
 void ANYMonsterBase::CommitAttackOnServer()
 {
     // Server: windup finished. Skip if the monster died, pooled, or lost its target during the delay.
-    if (!HasAuthority() || CurrentHp <= 0.0f || !ActivationData.bIsActive || ActivationData.Target == nullptr)
+    if (!HasAuthority() || CurrentHp <= 0.0f || !ActivationData.bIsActive || !IsChaseTargetValid(ActivationData.Target))
     {
         return;
     }

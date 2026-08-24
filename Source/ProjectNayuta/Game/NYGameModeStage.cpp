@@ -67,6 +67,11 @@ void ANYGameModeStage::HandleStartingNewPlayer_Implementation(APlayerController*
 
 void ANYGameModeStage::Logout(AController* Exiting)
 {
+	if (APawn* LeavingPawn = Exiting ? Exiting->GetPawn() : nullptr)
+	{
+		RetargetMonstersChasing(LeavingPawn);
+	}
+
 	Super::Logout(Exiting);
 
 	if (CurrWave == 0)
@@ -151,11 +156,34 @@ bool ANYGameModeStage::TryGetWeaponLevelRow(FName WeaponID, int32 Level, FNYWeap
 
 void ANYGameModeStage::OnPlayerDied(ANYPlayerControllerStage* PC_victim)
 {
-	(void)PC_victim;
+	if (APawn* VictimPawn = PC_victim ? PC_victim->GetPawn() : nullptr)
+	{
+		RetargetMonstersChasing(VictimPawn);
+	}
 
 	if (CountPlayersInPhase(ENYPlayerPhase::Alive) <= 0)
 	{
 		GameOver();
+	}
+}
+
+void ANYGameModeStage::RetargetMonstersChasing(AActor* OldTarget)
+{
+	if (!OldTarget)
+	{
+		return;
+	}
+
+	TArray<AActor*> Monsters;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANYMonsterBase::StaticClass(), Monsters);
+
+	for (AActor* Actor : Monsters)
+	{
+		ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Actor);
+		if (Monster && Monster->IsActive() && Monster->GetChaseTarget() == OldTarget)
+		{
+			Monster->RetargetOrIdleOnServer();
+		}
 	}
 }
 
