@@ -203,6 +203,11 @@ void ANYGameModeStage::StartNextWave()
 			{
 				if (MyPS->GetPawn() != nullptr)
 				{
+					if (MyPS->GetCurrHp() <= 0.0f)
+					{
+						MyPS->SetCurrHp(MyPS->GetMaxHp());
+					}
+
 					MyPS->SetPlayerPhase(ENYPlayerPhase::Alive);
 				}
 			}

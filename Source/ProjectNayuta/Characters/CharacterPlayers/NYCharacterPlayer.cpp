@@ -355,6 +355,14 @@ void ANYCharacterPlayer::Revive()
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.0f);
+        }
+    }
 }
 
 void ANYCharacterPlayer::ResolveMonsterSoftCollision()

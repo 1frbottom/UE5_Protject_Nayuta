@@ -150,7 +150,7 @@ protected:
 
 	/** Pre-warmed monster count; sized for peak concurrent spawns across all spawners. */
 	UPROPERTY(EditDefaultsOnly, Category = "Spawner", meta = (ClampMin = "1"))
-	int32 InitialPoolSize = 500;
+	int32 InitialPoolSize = 1000;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNYMonsterSpawnComponent>> ActiveSpawnComponents;
