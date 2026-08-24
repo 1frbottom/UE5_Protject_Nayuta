@@ -39,4 +39,12 @@ protected:
 	UPROPERTY()
 	TArray<TObjectPtr<ANYMonsterBase>> InactivePool;
 
+	/** Class last passed to InitializePool. ReturnMonster destroys mismatches instead of pooling them. */
+	UPROPERTY(Transient, Category = "Pool")
+	TSubclassOf<ANYMonsterBase> PooledMonsterClass;
+
+private:
+	/** Destroys every actor still referenced by InactivePool, then empties the array. */
+	void DestroyInactiveMonsters();
+
 };

@@ -19,7 +19,10 @@ void UNYMonsterPoolComponent::InitializePool(TSubclassOf<ANYMonsterBase> Monster
 		return;
 	}
 
+	// Reset() only drops pointers. Destroy the previous class or the actors stay in the world.
+	DestroyInactiveMonsters();
 	InactivePool.Reset(PoolSize);
+	PooledMonsterClass = MonsterClass;
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -60,6 +63,29 @@ void UNYMonsterPoolComponent::ReturnMonster(ANYMonsterBase* Monster)
 		return;
 	}
 
+	if (PooledMonsterClass && Monster->GetClass() != PooledMonsterClass)
+	{
+		Monster->Destroy();
+		return;
+	}
+
 	Monster->DeactivateOnServer();
 	InactivePool.Add(Monster);
+}
+
+void UNYMonsterPoolComponent::DestroyInactiveMonsters()
+{
+	for (ANYMonsterBase* Monster : InactivePool)
+	{
+		if (!IsValid(Monster))
+		{
+			continue;
+		}
+
+		// DormantAll hides these from net relevancy; wake so Destroy replicates to clients.
+		Monster->SetNetDormancy(DORM_Awake);
+		Monster->Destroy();
+	}
+
+	InactivePool.Reset();
 }
