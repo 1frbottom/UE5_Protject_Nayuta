@@ -3,12 +3,15 @@
 
 #include "Player/NYPlayerControllerStage.h"
 
-#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameFramework/PawnMovementComponent.h"
+
 #include "Blueprint/UserWidget.h"
 
-#include "Game/NYGameMode.h"
-#include "Player/NYPlayerStateBase.h"
+#include "Game/NYGameModeStage.h"
+#include "Game/NYGameStateStage.h"
+
+#include "Player/NYPlayerStateStage.h"
 
 
 
@@ -16,65 +19,187 @@ void ANYPlayerControllerStage::BeginPlay()
 {
     Super::BeginPlay();
 
-    FInputModeGameOnly InputMode;
-    SetInputMode(InputMode);
-    bShowMouseCursor = false;
+    if (IsLocalPlayerController())
+    {
+        ApplyInputConfig(ENYInputConfig::Gameplay);
+    }
+}
 
+void ANYPlayerControllerStage::OnPossess(APawn* InPawn)
+{
+    Super::OnPossess(InPawn);
+
+    if (!IsLocalPlayerController())
+    {
+        return;
+    }
+
+    ENYInputConfig Config = ENYInputConfig::Gameplay;
+
+    if (bIsPaused)
+    {
+        Config = ENYInputConfig::ModalUI;
+    }
+    else if (ANYGameStateStage* GS = GetWorld()->GetGameState<ANYGameStateStage>())
+    {
+        switch (GS->GetGamePhase())
+        {
+        case ENYGamePhase::Rewarding:
+        case ENYGamePhase::GameOver:
+        case ENYGamePhase::GameClear:
+            Config = ENYInputConfig::ModalUI;
+            break;
+        default:
+            break;
+        }
+    }
+
+    ApplyInputConfig(Config);
 }
 
 void ANYPlayerControllerStage::SetupInputComponent()
 {
     Super::SetupInputComponent();
+}
 
+void ANYPlayerControllerStage::ApplyInputConfig(ENYInputConfig Config)
+{
+    if (!IsLocalPlayerController())
+    {
+        return;
+    }
 
+    // Clear held keys before IMC swap so Sprint/etc. get a clean Completed.
+    FlushPressedKeys();
+
+    UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+
+    switch (Config)
+    {
+    case ENYInputConfig::Gameplay:
+        if (Subsystem && IMC_InGame)
+        {
+            Subsystem->AddMappingContext(IMC_InGame, 0);
+        }
+
+        SetInputMode(FInputModeGameOnly());
+        bShowMouseCursor = false;
+        bIsPaused = false;
+        break;
+
+    case ENYInputConfig::ModalUI:
+        if (Subsystem && IMC_InGame)
+        {
+            Subsystem->RemoveMappingContext(IMC_InGame);
+        }
+
+        {
+            FInputModeGameAndUI InputMode;
+            InputMode.SetHideCursorDuringCapture(false);
+            SetInputMode(InputMode);
+        }
+        bShowMouseCursor = true;
+
+        if (APawn* ControlledPawn = GetPawn())
+        {
+            if (UPawnMovementComponent* MoveComp = ControlledPawn->GetMovementComponent())
+            {
+                MoveComp->StopMovementImmediately();
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
+void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    switch (NewPhase)
+    {
+    case ENYGamePhase::Playing:
+        ApplyInputConfig(ENYInputConfig::Gameplay);
+        break;
+    case ENYGamePhase::Rewarding:
+        ApplyInputConfig(ENYInputConfig::ModalUI);
+        break;
+    case ENYGamePhase::GameOver:
+        ApplyInputConfig(ENYInputConfig::ModalUI);
+        ShowGameOverUI();
+        break;
+    case ENYGamePhase::GameClear:
+    {
+        int32 GoldEarned = 0;
+        int32 WavesCleared = 0;
+
+        if (ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState))
+        {
+            GoldEarned = PS->GetCurrGold();
+        }
+
+        if (const ANYGameStateStage* GS = GetWorld()->GetGameState<ANYGameStateStage>())
+        {
+            WavesCleared = GS->ReplicatedClearedWaveCount;
+        }
+
+        ApplyInputConfig(ENYInputConfig::ModalUI);
+        ShowGameClearUI(WavesCleared, GoldEarned);
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 void ANYPlayerControllerStage::TogglePause()
 {
-    // 1. 설정창이 열려있는지 상태를 먼저 기록
-    bool bWasSettingOpen = (SettingWidgetRef != nullptr && SettingWidgetRef->IsInViewport());
+    const bool bWasSettingOpen = (SettingWidgetRef != nullptr && SettingWidgetRef->IsInViewport());
 
-    // 2. 부모의 설정창 닫기 로직 실행
     Super::TogglePause();
 
-    // 3. 만약 설정창을 닫은 거라면 여기서 함수 종료 (P키로 설정창만 닫음)
     if (bWasSettingOpen)
     {
         return;
     }
 
-    // 4. 설정창이 없을 때만 기존의 일시정지 로직 실행
-    UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
-
     if (bIsPaused)
     {
         OnTogglePauseMenu();
-        if (Subsystem && IMC_InGame) Subsystem->AddMappingContext(IMC_InGame, 0);
-        SetInputMode(FInputModeGameOnly());
-        bShowMouseCursor = false;
-        bIsPaused = false;
+        ApplyInputConfig(ENYInputConfig::Gameplay);
     }
     else
     {
         OnTogglePauseMenu();
-        if (Subsystem && IMC_InGame) Subsystem->RemoveMappingContext(IMC_InGame);
-        FInputModeGameAndUI InputMode;
-        InputMode.SetHideCursorDuringCapture(false);
-        SetInputMode(InputMode);
-        bShowMouseCursor = true;
+        ApplyInputConfig(ENYInputConfig::ModalUI);
         bIsPaused = true;
     }
+}
 
-
+void ANYPlayerControllerStage::ConfirmRewardSelection(int32 SlotIndex)
+{
+    Server_SelectReward(SlotIndex);
 }
 
 void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeIndex)
 {
-    ANYPlayerStateBase* PS = Cast<ANYPlayerStateBase>(PlayerState);
-    if (PS->GetPlayerPhase() != ENYPlayerPhase::Rewarding)
+    ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
+    if (!PS || PS->GetPlayerPhase() != ENYPlayerPhase::Rewarding)
+    {
         return;
+    }
 
-    if (ANYGameMode* GM = Cast<ANYGameMode>(GetWorld()->GetAuthGameMode()))
+    if (!PS->TrySelectReward(UpgradeIndex))
+    {
+        return;
+    }
+
+    if (ANYGameModeStage* GM = Cast<ANYGameModeStage>(GetWorld()->GetAuthGameMode()))
     {
         GM->OnPlayerRewarded();
     }
@@ -82,12 +207,22 @@ void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeI
 
 void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
 {
-    ANYPlayerStateBase* PS = Cast<ANYPlayerStateBase>(PlayerState);
+    ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
     if (PS->GetPlayerPhase() != ENYPlayerPhase::Dead)
+    {
         return;
+    }
 
-    if (ANYGameMode* GM = GetWorld()->GetAuthGameMode<ANYGameMode>())
+    if (ANYGameModeStage* GM = GetWorld()->GetAuthGameMode<ANYGameModeStage>())
     {
         GM->AddRetryVote();
+    }
+}
+
+void ANYPlayerControllerStage::Server_RequestReturnToMainMenu_Implementation()
+{
+    if (ANYGameModeStage* GM = GetWorld()->GetAuthGameMode<ANYGameModeStage>())
+    {
+        GM->ReturnToMainMenu();
     }
 }

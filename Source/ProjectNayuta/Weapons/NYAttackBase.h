@@ -6,8 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "NYAttackBase.generated.h"
 
-class UBoxComponent;
-class UProjectileMovementComponent;
+class UStaticMeshComponent;
 
 /**
 Must be implemented { OnOverlapBegin() -> ApplyDamage() } in child class.
@@ -16,21 +15,26 @@ UCLASS()
 class PROJECTNAYUTA_API ANYAttackBase : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	ANYAttackBase();
 
-public:	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	virtual void InitAttackStat(float InDamage, float InRange);
 
+// Component
 protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Attack")
-	float CurrentDamage;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
+	TObjectPtr<UStaticMeshComponent> StaticMeshComp;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Attack")
-	float CurrentRange;
+// Attack
+protected:
+	/** Replicated so clients can scale VFX from BeginPlay (e.g. sword slash). */
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Attack")
+	float CurrentDamage = 0.0f;
 
-
-
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Attack")
+	float CurrentRange = 0.0f;
 
 };

@@ -17,6 +17,4 @@ class PROJECTNAYUTA_API ANYAttackMonsterBase : public ANYAttackBase
 protected:
 	virtual void BeginPlay() override;
 
-
-	
 };

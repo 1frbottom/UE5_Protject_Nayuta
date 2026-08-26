@@ -10,7 +10,7 @@ void ANYAttackMonsterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// BP에서 추가한 모든 충돌체를 찾아 몬스터 공격 채널로 강제 세팅
+	// Find all collision components added in BP and force set them to the monster attack channel
 	TArray<UShapeComponent*> ShapeComps;
 	GetComponents<UShapeComponent>(ShapeComps);
 

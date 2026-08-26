@@ -4,57 +4,121 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Engine/DataTable.h"
 
 #include "NYWeaponComponent.generated.h"
 
 class ANYAttackPlayerBase;
+class UNYWeaponDefinition;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNYOnWeaponLevelChanged, int32, NewLevel);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FNYOnWeaponSlotsChanged);
 
 USTRUCT(BlueprintType)
-struct FWeaponStatRow : public FTableRowBase
+struct FNYWeaponSlot
 {
 	GENERATED_BODY()
 
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	TSubclassOf<ANYAttackPlayerBase> AttackClass;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+	TObjectPtr<UNYWeaponDefinition> Definition = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	float BaseDamage;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	float AttackRange;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	float Cooldown;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+	int32 Level = 1;
 };
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTNAYUTA_API UNYWeaponComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UNYWeaponComponent();
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+
+// Weapon
+public:
+	/** Server: set the primary weapon definition and reset its level to 1. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SetWeaponDefinition(UNYWeaponDefinition* NewDefinition);
+
+	/** Server: set the secondary weapon definition and reset its level to 1. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SetSecondaryWeaponDefinition(UNYWeaponDefinition* NewDefinition);
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	bool CanSwapWeaponSlots() const;
+
+	/** Server: swap primary and secondary slot contents. No-op when secondary is empty. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SwapWeaponSlots();
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	const FNYWeaponSlot& GetPrimarySlot() const { return PrimarySlot; }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	const FNYWeaponSlot& GetSecondarySlot() const { return SecondarySlot; }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	int32 GetCurrentWeaponLevel() const { return PrimarySlot.Level; }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	int32 GetMaxWeaponLevel() const;
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	bool CanLevelUpWeapon() const;
+
+	/** Server: increase weapon level for the given slot. Returns false at max level or empty slot. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	bool LevelUpSlot(bool bPrimary);
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	bool CanLevelUpSlot(bool bPrimary) const;
+
+	/** Server: increase primary weapon level. Returns false at max level. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	bool LevelUpWeapon();
+
+	/** Server: reset both slots for a new stage run. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void ResetWeaponLevel();
+
+	UPROPERTY(BlueprintAssignable, Category = "Weapon")
+	FNYOnWeaponLevelChanged OnWeaponLevelChanged;
+
+	/** Fires when primary/secondary slot contents change (equip, swap, level, reset, OnRep). */
+	UPROPERTY(BlueprintAssignable, Category = "Weapon")
+	FNYOnWeaponSlotsChanged OnWeaponSlotsChanged;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	TObjectPtr<UDataTable> WeaponDataTable;
+	void ApplyWeaponDefinition();
+	void RefreshAttackTimer();
+	void NotifyWeaponLevelChanged();
+	void NotifyWeaponSlotsChanged();
 
-	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	FName WeaponID;		// 예: "Weapon_Katana", "Weapon_Fireball"
+	int32 GetMaxWeaponLevelForSlot(const FNYWeaponSlot& Slot) const;
+	const FNYWeaponSlot& GetSlot(bool bPrimary) const;
 
-	// 실제 인게임에서 사용할 현재 스탯
+	UFUNCTION()
+	void OnRep_WeaponSlots();
+
+	UPROPERTY(EditDefaultsOnly, ReplicatedUsing = OnRep_WeaponSlots, Category = "Weapon")
+	FNYWeaponSlot PrimarySlot;
+
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponSlots, BlueprintReadOnly, Category = "Weapon")
+	FNYWeaponSlot SecondarySlot;
+
 	TSubclassOf<ANYAttackPlayerBase> CurrentAttackClass;
-	float CurrentDamage;
-	float CurrentRange;
-	float CurrentCooldown;
+	float CurrentDamage = 0.0f;
+	float CurrentRange = 0.0f;
+	float CurrentCooldown = 0.0f;
 
 	FTimerHandle AttackTimer;
 
 	void FireAttack();
-		
+
 };

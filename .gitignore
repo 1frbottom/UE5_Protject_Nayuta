@@ -1,11 +1,28 @@
-# customized
+# UE customized
 Content/Developers/*
 Content/ThirdParty/*
 Content/Sound/*
+Content/Image/*
+Content/Fab/*
+Scripts/
 
 
+# Cursor
+.agents/
+skills-lock.json
+.ignore
+.cursor
 
-# Visual Studio 2015 user specific files
+# C/C++
+compile_commands.json
+.clangd
+.editorconfig
+
+# Visual Studio Code (UE regenerates c_cpp_properties; custom tasks persist in tasks.json)
+.vscode/*
+*.code-workspace
+
+# Visual Studio
 .vs/
 
 # Compiled Object files
@@ -79,8 +96,4 @@ Intermediate/*
 Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
-<<<<<<< HEAD
 DerivedDataCache/*
-=======
-DerivedDataCache/*
->>>>>>> 62fd68c3b62d6ed22b6e953475d4109794f09ac1

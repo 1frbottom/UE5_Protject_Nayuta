@@ -5,32 +5,39 @@
 
 #include "ProjectNayuta.h"
 
+#include "Engine/OverlapResult.h"
+#include "Engine/LocalPlayer.h"
+
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 
 #include "Net/UnrealNetwork.h"      // DOREPLIFETIME
 
 #include "Kismet/GameplayStatics.h"
+
+#include "Game/NYGameModeStage.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
-#include "Engine/OverlapResult.h"
 
-#include "Weapons/NYAttackBase.h"
+#include "Player/NYPlayerControllerBase.h"
+#include "Player/NYPlayerStateStage.h"
+
 #include "Weapons/NYWeaponComponent.h"
+#include "Weapons/NYWeaponDefinition.h"
 
-#include "Player/NYPlayerControllerStage.h"
-#include "Player/NYPlayerStateBase.h"
-
-#include "Game/NYGameMode.h"
+#include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 
 
 
 ANYCharacterPlayer::ANYCharacterPlayer()
 {
+    PrimaryActorTick.bCanEverTick = true;
+
     // Camera
     SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
     SpringArmComp->SetupAttachment(RootComponent);
@@ -45,15 +52,23 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     GetCapsuleComponent()->SetCollisionProfileName(PROFILE_PLAYER);
 
     // Movement
-    bUseControllerRotationYaw = false;
-    GetCharacterMovement()->bOrientRotationToMovement = true;
+    // Face control yaw so AnimBP Direction can drive strafe/back blend-space clips.
+    bUseControllerRotationYaw = true;
+    GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
+
+        // test
+    GetCharacterMovement()->JumpZVelocity = 700.f;
 
     // Stat
 
 
     // Weapon
     DefaultWeaponComp = CreateDefaultSubobject<UNYWeaponComponent>(TEXT("DefaultWeaponComp"));
+
+    WeaponMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMeshComp"));
+    WeaponMeshComp->SetupAttachment(GetMesh());
+    WeaponMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     // Multiplay
     bReplicates = true;     // make this actor replicated by network
@@ -62,10 +77,23 @@ ANYCharacterPlayer::ANYCharacterPlayer()
 
 }
 
+void ANYCharacterPlayer::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    ResolveMonsterSoftCollision();
+}
+
 void ANYCharacterPlayer::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (DefaultWeaponComp)
+	{
+		DefaultWeaponComp->OnWeaponSlotsChanged.AddDynamic(this, &ANYCharacterPlayer::UpdateWeaponVisual);
+		UpdateWeaponVisual();
+	}
+
     // core logic : should be started by server(host)
     if (HasAuthority())
     {
@@ -76,6 +104,16 @@ void ANYCharacterPlayer::BeginPlay()
 
 }
 
+void ANYCharacterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (DefaultWeaponComp)
+	{
+		DefaultWeaponComp->OnWeaponSlotsChanged.RemoveDynamic(this, &ANYCharacterPlayer::UpdateWeaponVisual);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 // after possessed, server only
 void ANYCharacterPlayer::PossessedBy(AController* NewController)
 {
@@ -83,7 +121,7 @@ void ANYCharacterPlayer::PossessedBy(AController* NewController)
 
     InitPlayerState();
 
-    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
+    PC_ref = Cast<ANYPlayerControllerBase>(GetController());
 
 }
 
@@ -92,19 +130,9 @@ void ANYCharacterPlayer::PawnClientRestart()
 {
     Super::PawnClientRestart();
 
-    PC_ref = Cast<ANYPlayerControllerStage>(GetController());
-    // add IMC into PlayerController
-    if (PC_ref)
-    {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC_ref->GetLocalPlayer()))
-        {
-            if (DefaultMappingContext)
-            {
-                Subsystem->AddMappingContext(DefaultMappingContext, 0);
-            }
-        }
-    }
+    InitPlayerState();
 
+    PC_ref = Cast<ANYPlayerControllerBase>(GetController());
 }
 
 void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -114,6 +142,8 @@ void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 }
 
+
+// PlayerState
 void ANYCharacterPlayer::OnRep_PlayerState()
 {
     Super::OnRep_PlayerState();
@@ -123,17 +153,16 @@ void ANYCharacterPlayer::OnRep_PlayerState()
 
 void ANYCharacterPlayer::InitPlayerState()
 {
-    PS_ref = GetPlayerState<ANYPlayerStateBase>();
+    PS_ref = GetPlayerState<ANYPlayerStateStage>();
 
     if (PS_ref)
     {
-        GetCharacterMovement()->MaxWalkSpeed = PS_ref->GetMoveSpeed();
-
+        PS_ref->ApplyMoveSpeedToPawn();
     }
 }
 
-// bind trigger to specific function 
-// FInputActionValue : automatically processed when the player possess the pawn
+
+// Input
 void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -156,8 +185,8 @@ void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
         EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
         EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
-
-
+        // Weapon swap
+        EnhancedInputComponent->BindAction(WeaponSwapAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::SwapWeaponSlots);
     }
 
 
@@ -178,21 +207,21 @@ void ANYCharacterPlayer::Look(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 {
-    if (!PS_ref && PS_ref->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS_ref || !PS_ref->CanControlPawn())
         return;
 
     FVector2D MovementVector = Value.Get<FVector2D>();
 
     if (Controller != nullptr)
     {
-        // 컨트롤러(카메라)가 바라보는 방향을 기준으로 전방 및 우측 벡터를 계산
+        // Calculate front and right vectors based on the direction the controller (camera) looks at
         const FRotator Rotation = Controller->GetControlRotation();
         const FRotator YawRotation(0, Rotation.Yaw, 0);
 
         const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
         const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-        // 입력값에 따라 이동
+        // Move according to input value
         AddMovementInput(ForwardDirection, MovementVector.Y);
         AddMovementInput(RightDirection, MovementVector.X);
     }
@@ -200,32 +229,83 @@ void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Sprint()
 {
-    GetCharacterMovement()->MaxWalkSpeed += 250.0f;
+    if (!PS_ref || !PS_ref->CanControlPawn())
+        return;
 
-    if (!HasAuthority())
+    if (HasAuthority())
     {
-        Server_Sprint();
+        PS_ref->SetSprinting(true);
     }
-}
-void ANYCharacterPlayer::Server_Sprint_Implementation()
-{
-    GetCharacterMovement()->MaxWalkSpeed += 250.0f;
+    else
+    {
+        Server_SetSprinting(true);
+    }
 }
 
 void ANYCharacterPlayer::StopSprint()
 {
-    GetCharacterMovement()->MaxWalkSpeed -= 250.0f;
-
-    if (!HasAuthority())
+    if (HasAuthority())
     {
-        Server_StopSprint();
+        if (PS_ref)
+            PS_ref->SetSprinting(false);
+    }
+    else
+    {
+        Server_SetSprinting(false);
     }
 }
-void ANYCharacterPlayer::Server_StopSprint_Implementation()
+
+void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
 {
-    GetCharacterMovement()->MaxWalkSpeed -= 250.0f;
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        PS->SetSprinting(bSprint);
+    }
 }
 
+void ANYCharacterPlayer::SwapWeaponSlots()
+{
+    if (!PS_ref || !PS_ref->CanControlPawn())
+    {
+        return;
+    }
+
+    if (!DefaultWeaponComp || !DefaultWeaponComp->CanSwapWeaponSlots())
+    {
+        return;
+    }
+
+    if (HasAuthority())
+    {
+        if (DefaultWeaponComp)
+        {
+            DefaultWeaponComp->SwapWeaponSlots();
+        }
+    }
+    else
+    {
+        Server_SwapWeaponSlots();
+    }
+}
+
+void ANYCharacterPlayer::Server_SwapWeaponSlots_Implementation()
+{
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        if (!PS->CanControlPawn())
+        {
+            return;
+        }
+    }
+
+    if (DefaultWeaponComp)
+    {
+        DefaultWeaponComp->SwapWeaponSlots();
+    }
+}
+
+
+// Stat
 float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     if (!HasAuthority() || !PS_ref)
@@ -233,31 +313,208 @@ float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 
     PS_ref->ApplyDamage(DamageAmount);
 
+    if (PS_ref->GetPlayerPhase() == ENYPlayerPhase::Alive)
+    {
+        const UWorld* World = GetWorld();
+        const float Now = World ? World->GetTimeSeconds() : 0.0f;
+        if (LastHitReactServerTime < 0.0f || Now - LastHitReactServerTime >= HitReactRetriggerDelay)
+        {
+            LastHitReactServerTime = Now;
+            Multicast_OnHitFeedback(DamageAmount);
+        }
+    }
+
     return DamageAmount;
 }
 
 void ANYCharacterPlayer::Die()
 {
-    // prevent falling down
-    GetCharacterMovement()->DisableMovement();
+    bIsDead = true;
 
-    // Capule No Collision
+    GetCharacterMovement()->DisableMovement();
+    GetCharacterMovement()->StopMovementImmediately();
+
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // Body remains?
+    // Attack montages occupy the slot until stopped; AnimGraph death waits otherwise.
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.15f);
+        }
 
-    // dead animation
-
-
+        OnDeathFeedback();
+    }
 }
 
 void ANYCharacterPlayer::Revive()
 {
+    bIsDead = false;
+
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
-    // stop dead animation?
-
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.0f);
+        }
+    }
 }
 
+void ANYCharacterPlayer::ResolveMonsterSoftCollision()
+{
+    if (!PS_ref)
+    {
+        PS_ref = GetPlayerState<ANYPlayerStateStage>();
+    }
+
+    if (!PS_ref || !PS_ref->CanControlPawn())
+        return;
+
+    const UCapsuleComponent* PlayerCapsule = GetCapsuleComponent();
+    if (!PlayerCapsule || !PlayerCapsule->IsCollisionEnabled())
+        return;
+
+    UWorld* World = GetWorld();
+    if (!World)
+        return;
+
+    const float PlayerRadius = PlayerCapsule->GetScaledCapsuleRadius();
+    const float QueryRadius = PlayerRadius + 50.0f + MonsterSeparationQueryPadding;
+
+    TArray<FOverlapResult> OverlapResults;
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(MonsterSoftSeparation), false, this);
+
+    FCollisionObjectQueryParams ObjectQueryParams;
+    ObjectQueryParams.AddObjectTypesToQuery(ECC_MONSTER);
+
+    World->OverlapMultiByObjectType(
+        OverlapResults,
+        GetActorLocation(),
+        FQuat::Identity,
+        ObjectQueryParams,
+        FCollisionShape::MakeSphere(QueryRadius),
+        QueryParams);
+
+    if (OverlapResults.IsEmpty())
+        return;
+
+    const FVector PlayerLocation = GetActorLocation();
+    const float PlayerPushWeight = GetLastMovementInputVector().SizeSquared2D() > KINDA_SMALL_NUMBER
+        ? PlayerPushWeightWhileMoving
+        : PlayerPushWeightWhileIdle;
+
+    FVector AccumulatedPlayerOffset = FVector::ZeroVector;
+
+    for (const FOverlapResult& Result : OverlapResults)
+    {
+        ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
+        if (!Monster || !Monster->IsActorTickEnabled())
+            continue;
+
+        const UCapsuleComponent* MonsterCapsule = Monster->GetCapsuleComponent();
+        if (!MonsterCapsule)
+            continue;
+
+        FVector Separation = Monster->GetActorLocation() - PlayerLocation;
+        Separation.Z = 0.0f;
+
+        const float DistSq = Separation.SizeSquared2D();
+        const float MinDist = PlayerRadius + MonsterCapsule->GetScaledCapsuleRadius();
+
+        if (DistSq >= FMath::Square(MinDist))
+            continue;
+
+        FVector PushDir;
+        float Penetration = MinDist;
+
+        if (DistSq < KINDA_SMALL_NUMBER)
+        {
+            PushDir = FVector(FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-1.0f, 1.0f), 0.0f).GetSafeNormal();
+        }
+        else
+        {
+            const float Dist = FMath::Sqrt(DistSq);
+            PushDir = Separation / Dist;
+            Penetration = MinDist - Dist;
+        }
+
+        const float MonsterPushWeight = 1.0f - PlayerPushWeight;
+        const FVector MonsterOffset = PushDir * Penetration * MonsterPushWeight;
+        const FVector PlayerOffset = -PushDir * Penetration * PlayerPushWeight;
+
+        Monster->AddActorWorldOffset(MonsterOffset, true);
+        AccumulatedPlayerOffset += PlayerOffset;
+    }
+
+    if (!AccumulatedPlayerOffset.IsNearlyZero() && HasAuthority())
+    {
+        if (MaxPlayerSeparationPerTick > 0.0f)
+        {
+            AccumulatedPlayerOffset = AccumulatedPlayerOffset.GetClampedToMaxSize(MaxPlayerSeparationPerTick);
+        }
+
+        FHitResult Hit;
+        GetCharacterMovement()->SafeMoveUpdatedComponent(
+            AccumulatedPlayerOffset,
+            GetActorRotation(),
+            true,
+            Hit);
+    }
+}
+
+void ANYCharacterPlayer::Multicast_OnHitFeedback_Implementation(float DamageTaken)
+{
+    if (GetNetMode() == NM_DedicatedServer || bIsDead)
+    {
+        return;
+    }
+
+    OnHitFeedback(DamageTaken);
+}
+
+void ANYCharacterPlayer::ResetWeaponForNewRun()
+{
+    if (DefaultWeaponComp)
+    {
+        DefaultWeaponComp->ResetWeaponLevel();
+    }
+}
+
+void ANYCharacterPlayer::UpdateWeaponVisual()
+{
+	if (!WeaponMeshComp || !DefaultWeaponComp)
+	{
+		return;
+	}
+
+	const UNYWeaponDefinition* Definition = DefaultWeaponComp->GetPrimarySlot().Definition;
+	UStaticMesh* NewMesh = Definition ? Definition->WeaponMesh : nullptr;
+	WeaponMeshComp->SetStaticMesh(NewMesh);
+	RefreshHeldWeaponMeshVisibility();
+}
+
+void ANYCharacterPlayer::PushHeldWeaponMeshHidden()
+{
+	++HeldWeaponMeshHideCount;
+	RefreshHeldWeaponMeshVisibility();
+}
+
+void ANYCharacterPlayer::PopHeldWeaponMeshHidden()
+{
+	HeldWeaponMeshHideCount = FMath::Max(0, HeldWeaponMeshHideCount - 1);
+	RefreshHeldWeaponMeshVisibility();
+}
+
+void ANYCharacterPlayer::RefreshHeldWeaponMeshVisibility()
+{
+	if (WeaponMeshComp)
+	{
+		WeaponMeshComp->SetHiddenInGame(HeldWeaponMeshHideCount > 0);
+	}
+}

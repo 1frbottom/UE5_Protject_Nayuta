@@ -6,10 +6,39 @@
 #include "GameFramework/Pawn.h"
 #include "NYMonsterBase.generated.h"
 
+
+
 class UCapsuleComponent;
 class USkeletalMeshComponent;
 class UWidgetComponent;
 class UNYHpBarWidgetMonster;
+class UNYMonsterMovementComponent;
+class UAnimMontage;
+class INYMonsterLifecycleInterface;
+
+/** Replicated active/inactive state for pooled monsters (target + spawn snap). */
+USTRUCT()
+struct FMonsterActivationData
+{
+    GENERATED_BODY()
+
+    /** When true, monster is visible/collidable. Target may still be null (idle). */
+    UPROPERTY()
+    bool bIsActive = false;
+
+    UPROPERTY()
+    TObjectPtr<AActor> Target;
+
+    UPROPERTY()
+    FVector SpawnLocation = FVector::ZeroVector;
+
+    /**
+     * Rolled once on the server and replicated so every machine derives the same move speed
+     * and approach angle. Drawing those locally would let the simulations drift apart.
+     */
+    UPROPERTY()
+    uint8 MoveSeed = 0;
+};
 
 UCLASS()
 class PROJECTNAYUTA_API ANYMonsterBase : public APawn
@@ -19,10 +48,18 @@ class PROJECTNAYUTA_API ANYMonsterBase : public APawn
 public:
 	ANYMonsterBase();
 
+    virtual void Tick(float DeltaTime) override;
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	virtual void BeginPlay() override;
 
+
 // Component
+public:
+    FORCEINLINE UCapsuleComponent* GetCapsuleComponent() const { return CapsuleComp; }
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<UCapsuleComponent> CapsuleComp;
@@ -30,47 +67,246 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
     TObjectPtr<USkeletalMeshComponent> SkeletalMeshComp;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
+    TObjectPtr<class UStaticMeshComponent> SphereComp;
+
+    /** Owns floor following, gravity, step-up and knockback. Driven from this actor's Tick. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
+    TObjectPtr<UNYMonsterMovementComponent> MovementComp;
+
+
+// Tick
+protected:
+    /**
+     * True while this monster needs a per-frame update: chasing a target, or sliding out the
+     * remainder of a knockback. Override to keep a subclass permanently off the tick.
+     */
+    virtual bool ShouldTick() const;
+
+    /**
+     * The one place that flips the actor tick. Call this after any state change that can alter
+     * ShouldTick() rather than touching SetActorTickEnabled() directly, so no path can strand
+     * the tick on (an idle horde burning frames) or off (a monster frozen mid-chase).
+     */
+    void RefreshTickState();
+
+
 // Stat
+public:
+    FORCEINLINE FName GetRewardRowID() const { return RewardRowID; }
+    FORCEINLINE float GetMaxHp() const { return MaxHp; }
+    FORCEINLINE float GetCurrentHp() const { return CurrentHp; }
+
+    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+
+    /** Authority-only: set MaxHp and refill CurrentHp. */
+    void SetMaxHpOnServer(float NewMaxHp);
+
 protected:
     UPROPERTY(EditAnywhere, Category = "Stat")
     float MoveSpeed = 200.0f;
 
-    // Hp
-    UPROPERTY(EditAnywhere, Category = "Stats")
+    /** Widest angle (degrees) a monster may lean off the straight line to its target. */
+    UPROPERTY(EditAnywhere, Category = "Stat")
+    float MaxApproachAngleOffset = 20.0f;
+
+    UPROPERTY()
+    float RandomizedMoveSpeed;
+
+    /** Derived from ActivationData.MoveSeed; spreads the horde without desyncing machines. */
+    UPROPERTY()
+    float ApproachAngleOffset = 0.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Stat")
     float MaxHp = 100.0f;
 
-    UPROPERTY(ReplicatedUsing = OnRep_CurrentHp, EditAnywhere, Category = "Stats")
-    float CurrentHp;
+    UPROPERTY(ReplicatedUsing = OnRep_CurrentHp, EditAnywhere, Category = "Stat")
+    float CurrentHp = 100.0f;
+
+    /** Row name in MonsterRewardDataTable (GameMode). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat")
+    FName RewardRowID = TEXT("Default");
+
+    /**
+     * Presentation hook for HP visuals (e.g. prototype SphereComp CPD).
+     * Fires on every CurrentHp replication, never on a dedicated server.
+     */
+    UFUNCTION(BlueprintImplementableEvent, Category = "Stat")
+    void OnHpChanged(float NewCurrentHp, float NewMaxHp);
 
     UFUNCTION()
     void OnRep_CurrentHp();
 
-// UI
-protected:
-    /* Must be designated in BP_MonsterASDF*/
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
-    TObjectPtr<UWidgetComponent> HpBarWidgetComp;
 
-    UPROPERTY()
-    TObjectPtr<UNYHpBarWidgetMonster> CachedHpBarWidget;
+// Death
+public:
+    FORCEINLINE bool IsDying() const { return bIsDying; }
+
+protected:
+    /** Authority-only: grant rewards, stop acting, and return to the pool after the death animation. */
+    void StartDeathOnServer(AController* KillerController);
+
+    /** Authority-only: hand the corpse back to the pool (or destroy it when no pool exists). */
+    void FinishDeathOnServer();
+
+    /** Authority-only: stop the shared attack timer. Override to add extra cleanup. */
+    virtual void StopAttackOnServer();
+
+    UFUNCTION(BlueprintImplementableEvent, Category = "Death")
+    void OnDeathFeedback();
+
+    /**
+     * The authoritative GameMode when it owns monster lifetime, otherwise null. Resolved per call
+     * instead of cached, since a pooled monster outlives nothing but is reused across waves.
+     */
+    INYMonsterLifecycleInterface* GetLifecycleHost() const;
+
+    /** Seconds the corpse stays visible so every machine can play the death animation. */
+    UPROPERTY(EditAnywhere, Category = "Death")
+    float DeathDuration = 2.0f;
+
+    /** Server-only. Clients infer the corpse state from replicated CurrentHp. */
+    UPROPERTY(Transient)
+    bool bIsDying = false;
+
+private:
+    FTimerHandle DeathTimerHandle;
+
+
+// Attack
+public:
+    /** True while the current attack's freeze window is active (position holds; facing keeps tracking the target). */
+    bool IsAttacking() const;
+
+protected:
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackDamage = 10.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackRange = 100.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackInterval = 0.5f;
+
+    /** Presentation only. One is picked at random per attack. Must be designated in BP_MonsterMelee / BP_MonsterRanged. */
+    UPROPERTY(EditDefaultsOnly, Category = "Attack")
+    TArray<TObjectPtr<UAnimMontage>> AttackMontages;
+
+    /**
+     * Named notify on the attack montage for the hit/release frame.
+     * Server reads the time from the asset and delays PerformAttack(); the notify itself must not spawn.
+     * Missing notify = PerformAttack at montage start.
+     */
+    UPROPERTY(EditDefaultsOnly, Category = "Attack")
+    FName AttackCommitNotifyName = TEXT("AttackCommit");
+
+    /** Freeze duration used when no montage is assigned for the chosen attack. */
+    UPROPERTY(EditAnywhere, Category = "Attack")
+    float AttackFreezeDuration = 0.3f;
+
+    /** Server-only. Gate for ProcessAttack: target, stagger, and range. Override to add extra conditions. */
+    virtual bool CanAttack() const;
+
+    /** Server-only. The actual attack effect (melee damage, projectile spawn, etc). */
+    virtual void PerformAttack() {}
+
+private:
+    FTimerHandle AttackTimerHandle;
+
+    /** Server-only. One-shot delay from montage start to AttackCommitNotifyName. */
+    FTimerHandle AttackCommitTimerHandle;
+
+    /** Server-only. Bound to AttackTimerHandle; starts the montage then schedules CommitAttackOnServer. */
+    void ProcessAttack();
+
+    /** Server-only. Runs PerformAttack after the commit delay (or immediately when no notify exists). */
+    void CommitAttackOnServer();
+
+    void ClearAttackTimers();
+
+    /** Seconds from montage start to NotifyName. 0 if the montage or notify is missing. */
+    static float GetAttackCommitDelay(const UAnimMontage* Montage, FName NotifyName);
+
+    /**
+     * NetMulticast, Reliable. Runs on every machine (including the server) so the local seek
+     * simulation freezes in step; MontageToPlay may be null when no montage is assigned.
+     */
+    UFUNCTION(NetMulticast, Reliable, Category = "Attack")
+    void Multicast_OnAttackStarted(UAnimMontage* MontageToPlay);
+
+    float AttackEndTime = 0.0f;
+
 
 // Multiplay
+public:
+    FORCEINLINE bool IsActive() const { return ActivationData.bIsActive; }
+    FORCEINLINE AActor* GetChaseTarget() const { return ActivationData.Target; }
+
+    /**
+     * Authority-only: show at StartLocation and chase NewTarget.
+     * A null NewTarget activates the monster idle â€” visible and collidable, but it never
+     * seeks or attacks (training sandbox).
+     */
+    void ActivateOnServer(AActor* NewTarget, FVector StartLocation);
+
+    /** Authority-only: chase a random Alive player, or idle if none remain. */
+    void RetargetOrIdleOnServer();
+
+    void DeactivateOnServer();  
+
 protected:
-    /* initialized by NYMonsterBase->SerTarget() */
-    UPROPERTY(Replicated, Transient)
-    TObjectPtr<AActor> TargetActor;
+    UPROPERTY(ReplicatedUsing = OnRep_ActivationData, Transient)
+    FMonsterActivationData ActivationData;
 
-public:	
-	virtual void Tick(float DeltaTime) override;
+    UFUNCTION()
+    virtual void OnRep_ActivationData();
 
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    /** True when Target is an Alive player. Dead pawns still exist, so this is not a null check. */
+    static bool IsChaseTargetValid(const AActor* Target);
 
-    // ¼­¹ö¿¡¼­ ÃÊ±â Å¸°ÙÀ» ¼³Á¤ÇØÁÖ´Â ÇÔ¼ö
-    /* called by NYMonsterSpawner */
-    void SetTarget(AActor* NewTarget);
+    /** Attack timer + tick enable from the current Target. Does not snap location. */
+    void ApplyChaseStateFromTarget();
 
-    // µ¥¹ÌÁö Ã³¸® (¼­¹ö¿¡¼­¸¸ ½ÇÇàµÊ)
-    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+private:
+    /** True after OnRep has applied the active pose; cleared on deactivate so the next life can snap. */
+    bool bHasAppliedActivePose = false;
 
+
+// Hit Reaction
+public:
+    /** True while a recent hit is suppressing this monster's seek and attacks. */
+    bool IsStaggered() const;
+
+protected:
+    /**
+     * Presentation only (montage, SFX, flash), authored in Blueprint.
+     * Fires on every machine that renders this monster, never on a dedicated server.
+     * Lethal hits still fire this so the hit flash plays; stagger/knockback do not.
+     */
+    UFUNCTION(BlueprintImplementableEvent, Category = "Hit")
+    void OnHitFeedback(float DamageTaken);
+
+    /** Seconds the monster stops seeking and attacking after taking damage. */
+    UPROPERTY(EditAnywhere, Category = "Hit")
+    float StaggerDuration = 0.15f;
+
+private:
+    /**
+     * Suppresses seek and attacks for StaggerDuration. Together with BeginKnockback() this is
+     * the gameplay half of a hit: both are driven by replicated HP so server and clients start
+     * them together, keeping the authoritative position close to what players see.
+     */
+    void BeginStagger();
+
+    /** Pushes the monster away from its chase target. No-op without a target. */
+    void BeginKnockback();
+
+    /** Clears stagger and knockback so a pooled monster never inherits the previous life's state. */
+    void ClearHitState();
+
+    float StaggerEndTime = 0.0f;
+
+    /** Locally cached HP so OnRep_CurrentHp can tell a hit apart from a pool refill. */
+    float LastObservedHp = 0.0f;
 
 };

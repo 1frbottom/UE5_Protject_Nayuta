@@ -1,65 +1,289 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Weapons/NYWeaponComponent.h"
 
 #include "ProjectNayuta.h"
 
-#include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
-#include "Characters/CharacterMonsters/NYMonsterBase.h"
 #include "Engine/OverlapResult.h"
+#include "GameFramework/Pawn.h"
+#include "Net/UnrealNetwork.h"
 
+#include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Game/NYGameStateStage.h"
+#include "Player/NYPlayerStateStage.h"
 
+#include "Weapons/NYWeaponDefinition.h"
+#include "Weapons/NYWeaponLevelLibrary.h"
+#include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
 
 UNYWeaponComponent::UNYWeaponComponent()
 {
 	SetIsReplicatedByDefault(true);
+}
 
+void UNYWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME(UNYWeaponComponent, PrimarySlot);
+	DOREPLIFETIME(UNYWeaponComponent, SecondarySlot);
 }
 
 void UNYWeaponComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 1. 데이터 테이블에서 정보 불러오기
-	if (WeaponDataTable && !WeaponID.IsNone())
-	{
-		static const FString ContextString(TEXT("Weapon Stat Lookup"));
-		FWeaponStatRow* RowData = WeaponDataTable->FindRow<FWeaponStatRow>(WeaponID, ContextString);
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+}
 
-		if (RowData)
-		{
-			CurrentAttackClass = RowData->AttackClass;
-			CurrentDamage = RowData->BaseDamage;
-			CurrentRange = RowData->AttackRange;
-			CurrentCooldown = RowData->Cooldown;
-		}
+void UNYWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearAllTimersForObject(this);
 	}
 
-	if (GetOwner()->HasAuthority() && CurrentAttackClass)
+	Super::EndPlay(EndPlayReason);
+}
+
+
+// Weapon
+void UNYWeaponComponent::SetWeaponDefinition(UNYWeaponDefinition* NewDefinition)
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
 	{
-		GetWorld()->GetTimerManager().SetTimer(AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
+		return;
 	}
 
+	PrimarySlot.Definition = NewDefinition;
+	PrimarySlot.Level = 1;
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
+}
 
+void UNYWeaponComponent::SetSecondaryWeaponDefinition(UNYWeaponDefinition* NewDefinition)
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	SecondarySlot.Definition = NewDefinition;
+	SecondarySlot.Level = 1;
+	NotifyWeaponSlotsChanged();
+}
+
+bool UNYWeaponComponent::CanSwapWeaponSlots() const
+{
+	return SecondarySlot.Definition != nullptr;
+}
+
+void UNYWeaponComponent::SwapWeaponSlots()
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CanSwapWeaponSlots())
+	{
+		return;
+	}
+
+	Swap(PrimarySlot, SecondarySlot);
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
+}
+
+int32 UNYWeaponComponent::GetMaxWeaponLevel() const
+{
+	return GetMaxWeaponLevelForSlot(PrimarySlot);
+}
+
+bool UNYWeaponComponent::CanLevelUpSlot(bool bPrimary) const
+{
+	const FNYWeaponSlot& Slot = GetSlot(bPrimary);
+	
+	return Slot.Definition && Slot.Level < GetMaxWeaponLevelForSlot(Slot);
+}
+
+bool UNYWeaponComponent::CanLevelUpWeapon() const
+{
+	return CanLevelUpSlot(true);
+}
+
+bool UNYWeaponComponent::LevelUpSlot(bool bPrimary)
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CanLevelUpSlot(bPrimary))
+	{
+		return false;
+	}
+
+	FNYWeaponSlot& Slot = bPrimary ? PrimarySlot : SecondarySlot;
+	Slot.Level++;
+
+	if (bPrimary)
+	{
+		ApplyWeaponDefinition();
+		RefreshAttackTimer();
+	}
+
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
+
+	return true;
+}
+
+bool UNYWeaponComponent::LevelUpWeapon()
+{
+	return LevelUpSlot(true);
+}
+
+void UNYWeaponComponent::ResetWeaponLevel()
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	const bool bPrimaryNeedsReset = PrimarySlot.Level != 1;
+	const bool bSecondaryNeedsReset = SecondarySlot.Definition != nullptr || SecondarySlot.Level != 1;
+
+	if (!bPrimaryNeedsReset && !bSecondaryNeedsReset)
+	{
+		return;
+	}
+
+	PrimarySlot.Level = 1;
+	SecondarySlot.Definition = nullptr;
+	SecondarySlot.Level = 1;
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
+}
+
+void UNYWeaponComponent::ApplyWeaponDefinition()
+{
+	CurrentAttackClass = nullptr;
+	CurrentDamage = 0.0f;
+	CurrentRange = 0.0f;
+	CurrentCooldown = 0.0f;
+
+	if (!PrimarySlot.Definition)
+	{
+		return;
+	}
+
+	FNYWeaponLevelRow LevelRow;
+	const UWorld* World = GetWorld();
+	const ANYGameStateStage* GS = World ? World->GetGameState<ANYGameStateStage>() : nullptr;
+	const UDataTable* WeaponLevelTable = GS ? GS->WeaponLevelDataTable : nullptr;
+
+	if (!NYWeaponLevel::TryGetRow(
+		WeaponLevelTable, PrimarySlot.Definition->WeaponID, PrimarySlot.Level, LevelRow))
+	{
+		LevelRow.DamageMultiplier = 1.0f;
+		LevelRow.RangeMultiplier = 1.0f;
+		LevelRow.CooldownMultiplier = 1.0f;
+	}
+
+	CurrentAttackClass = PrimarySlot.Definition->AttackClass;
+	CurrentDamage = PrimarySlot.Definition->BaseDamage * LevelRow.DamageMultiplier;
+	CurrentRange = PrimarySlot.Definition->AttackRange * LevelRow.RangeMultiplier;
+	CurrentCooldown = FMath::Max(
+		0.01f, PrimarySlot.Definition->Cooldown * LevelRow.CooldownMultiplier);
+}
+
+void UNYWeaponComponent::RefreshAttackTimer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AttackTimer);
+	}
+
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CurrentAttackClass || CurrentCooldown <= 0.0f)
+	{
+		return;
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(
+		AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
+}
+
+void UNYWeaponComponent::NotifyWeaponLevelChanged()
+{
+	OnWeaponLevelChanged.Broadcast(PrimarySlot.Level);
+}
+
+void UNYWeaponComponent::NotifyWeaponSlotsChanged()
+{
+	OnWeaponSlotsChanged.Broadcast();
+}
+
+int32 UNYWeaponComponent::GetMaxWeaponLevelForSlot(const FNYWeaponSlot& Slot) const
+{
+	if (!Slot.Definition || Slot.Definition->WeaponID.IsNone())
+	{
+		return 1;
+	}
+
+	const UWorld* World = GetWorld();
+	const ANYGameStateStage* GS = World ? World->GetGameState<ANYGameStateStage>() : nullptr;
+
+	return NYWeaponLevel::GetMaxLevel(GS ? GS->WeaponLevelDataTable : nullptr, Slot.Definition->WeaponID);
+}
+
+const FNYWeaponSlot& UNYWeaponComponent::GetSlot(bool bPrimary) const
+{
+	return bPrimary ? PrimarySlot : SecondarySlot;
+}
+
+void UNYWeaponComponent::OnRep_WeaponSlots()
+{
+	ApplyWeaponDefinition();
+	RefreshAttackTimer();
+	NotifyWeaponLevelChanged();
+	NotifyWeaponSlotsChanged();
 }
 
 void UNYWeaponComponent::FireAttack()
 {
-	if (!CurrentAttackClass)
+	if (!CurrentAttackClass || !GetOwner()->HasAuthority())
+	{
 		return;
+	}
+
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn)
+	{
+		return;
+	}
+
+	// Server: only fire while the owning player can control their pawn.
+	if (ANYPlayerStateStage* PS = OwnerPawn->GetPlayerState<ANYPlayerStateStage>())
+	{
+		if (!PS->CanControlPawn())
+		{
+			return;
+		}
+	}
 
 	FVector StartLoc = GetOwner()->GetActorLocation();
 	TArray<FOverlapResult> OverlapResults;
 	FCollisionQueryParams CollisionParams;
 	CollisionParams.AddIgnoredActor(GetOwner());
 
-	bool bHit = GetWorld()->OverlapMultiByChannel(
-		OverlapResults, StartLoc, FQuat::Identity, ECC_MONSTER,
+	GetWorld()->OverlapMultiByChannel(
+		OverlapResults, StartLoc, FQuat::Identity, ECC_PLAYERATTACK,
 		FCollisionShape::MakeSphere(CurrentRange), CollisionParams);
 
-	if (bHit)
+	if (OverlapResults.Num() > 0)
 	{
 		ANYMonsterBase* TargetMonster = nullptr;
 		float MinDistance = CurrentRange + 1.0f;
@@ -69,7 +293,7 @@ void UNYWeaponComponent::FireAttack()
 			ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
 			if (Monster)
 			{
-				float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
+				const float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
 				if (Distance < MinDistance)
 				{
 					MinDistance = Distance;
@@ -80,20 +304,22 @@ void UNYWeaponComponent::FireAttack()
 
 		if (TargetMonster)
 		{
-			FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
-			FRotator SpawnRotation = Direction.Rotation();
-			FVector SpawnLocation = StartLoc + (Direction * 50.0f);
+			const FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
+			const FRotator SpawnRotation = Direction.Rotation();
+			const FVector SpawnLocation = StartLoc + (Direction * 50.0f);
+			const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = GetOwner();
-			SpawnParams.Instigator = Cast<APawn>(GetOwner());
+			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActorDeferred<ANYAttackPlayerBase>(
+				CurrentAttackClass,
+				SpawnTransform,
+				GetOwner(),
+				OwnerPawn,
+				ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
-			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActor<ANYAttackPlayerBase>(CurrentAttackClass, SpawnLocation, SpawnRotation, SpawnParams);
-
-			// 스폰 직후 스탯 주입
 			if (SpawnedAttack)
 			{
 				SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);
+				SpawnedAttack->FinishSpawning(SpawnTransform);
 			}
 		}
 	}

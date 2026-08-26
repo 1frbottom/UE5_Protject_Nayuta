@@ -10,52 +10,34 @@
 
 ANYMonsterRanged::ANYMonsterRanged()
 {
-	LastFireTime = 0.0f;
+	RewardRowID = TEXT("Ranged");
 
-	AttackRangeSqrd = FMath::Square(AttackRange);
-
-
+	AttackDamage = 15.0f;
+	AttackRange = 500.0f;
+	AttackInterval = 2.0f;
 }
 
 void ANYMonsterRanged::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (HasAuthority())
-	{
-		GetWorldTimerManager().SetTimer(FireCheckTimerHandle, this, &ANYMonsterRanged::CheckAndFire, 0.2f, true);
-	}
-
 
 }
 
-void ANYMonsterRanged::CheckAndFire()
+// Attack
+void ANYMonsterRanged::PerformAttack()
 {
-	// 1. 타겟 체크
-	if (!TargetActor)
-		return;
-
-	// 2. 쿨타임 체크
-	float CurrentTime = GetWorld()->GetTimeSeconds();
-	if (CurrentTime - LastFireTime < FireRate)
-		return;
-
-	// 3. 거리 체크
-	float DistSq = FVector::DistSquared(GetActorLocation(), TargetActor->GetActorLocation());
-	if (DistSq <= AttackRangeSqrd)
-	{
-		FireProjectile();
-		LastFireTime = CurrentTime;
-	}
+	// Server-only: CommitAttackOnServer after AttackCommit notify (or immediately if the montage has none).
+	FireProjectile();
 }
 
 void ANYMonsterRanged::FireProjectile()
 {
-	if (!ProjectileClass || !TargetActor)
+	if (!ProjectileClass || !ActivationData.Target)
 		return;
 
 	FVector SpawnLocation = GetActorLocation() + GetActorForwardVector() * 50.0f;
-	FRotator SpawnRotation = (TargetActor->GetActorLocation() - SpawnLocation).Rotation();
+	FRotator SpawnRotation = (ActivationData.Target->GetActorLocation() - SpawnLocation).Rotation();
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
@@ -66,5 +48,12 @@ void ANYMonsterRanged::FireProjectile()
 	if (Projectile)
 	{
 		Projectile->InitAttackStat(AttackDamage, AttackRange);
+
+		FVector LaunchVelocity;
+		if (UGameplayStatics::SuggestProjectileVelocity_CustomArc(
+			this, LaunchVelocity, SpawnLocation, ActivationData.Target->GetActorLocation(), 0.0f, ProjectileArcParam))
+		{
+			Projectile->SetLaunchVelocity(LaunchVelocity);
+		}
 	}
 }

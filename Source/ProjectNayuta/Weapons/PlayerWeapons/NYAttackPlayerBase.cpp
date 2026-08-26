@@ -6,11 +6,15 @@
 #include "Components/ShapeComponent.h"
 #include "ProjectNayuta.h"
 
+#include "Characters/CharacterPlayers/NYCharacterPlayer.h"
+#include "Weapons/NYWeaponComponent.h"
+#include "Weapons/NYWeaponDefinition.h"
+
 void ANYAttackPlayerBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// BP에서 추가한 모든 충돌체를 찾아 몬스터 공격 채널로 강제 세팅
+	// Find all collision components added in BP and force set them to the player attack channel
 	TArray<UShapeComponent*> ShapeComps;
 	GetComponents<UShapeComponent>(ShapeComps);
 
@@ -19,5 +23,48 @@ void ANYAttackPlayerBase::BeginPlay()
 		Shape->SetCollisionProfileName(PROFILE_PLAYER_ATTACK);
 	}
 
+	TryHideHeldWeaponMesh();
+}
 
+void ANYAttackPlayerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	TryRestoreHeldWeaponMesh();
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void ANYAttackPlayerBase::TryHideHeldWeaponMesh()
+{
+	ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetInstigator());
+	if (!Character)
+	{
+		return;
+	}
+
+	const UNYWeaponComponent* WeaponComp = Character->GetWeaponComponent();
+	const UNYWeaponDefinition* Definition =
+		WeaponComp ? WeaponComp->GetPrimarySlot().Definition.Get() : nullptr;
+
+	if (!Definition || !Definition->bHideHeldMeshWhileAttacking)
+	{
+		return;
+	}
+
+	Character->PushHeldWeaponMeshHidden();
+	bHidHeldWeaponMesh = true;
+}
+
+void ANYAttackPlayerBase::TryRestoreHeldWeaponMesh()
+{
+	if (!bHidHeldWeaponMesh)
+	{
+		return;
+	}
+
+	if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetInstigator()))
+	{
+		Character->PopHeldWeaponMeshHidden();
+	}
+
+	bHidHeldWeaponMesh = false;
 }

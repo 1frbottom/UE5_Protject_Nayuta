@@ -5,15 +5,24 @@
 
 #include "ProjectNayuta.h"
 
+#include "Animation/AnimCompositeBase.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/AnimTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/World.h"
+#include "GameFramework/GameModeBase.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
-#include "Components/WidgetComponent.h"
-
-#include "UI/NYHpBarWidgetMonster.h"
-
-#include "Game/NYGameMode.h"
+#include "Characters/CharacterMonsters/NYMonsterMovementComponent.h"
+#include "Characters/CharacterPlayers/NYCharacterPlayer.h"
+#include "Game/NYGameStateBase.h"
+#include "Monsters/NYMonsterLifecycleInterface.h"
+#include "Player/NYPlayerStateStage.h"
 
 
 
@@ -21,50 +30,36 @@ ANYMonsterBase::ANYMonsterBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-    // Multiplay
     bReplicates = true;
-    SetReplicateMovement(true);
 
-    // Component
+    // Movement is simulated on each machine; ActivationData carries spawn position to clients.
+    SetReplicateMovement(false);
+
+    NetUpdateFrequency = 5.0f;
+    NetCullDistanceSquared = 9000000.0f;
+
+    NetDormancy = DORM_DormantAll;
+
+
     CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
     RootComponent = CapsuleComp;
     CapsuleComp->SetCollisionProfileName(PROFILE_MONSTER);
+    CapsuleComp->InitCapsuleSize(15.0f, 40.0f);
 
-        // UI
-    HpBarWidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("HpBarWidgetComp"));
-    HpBarWidgetComp->SetupAttachment(RootComponent);
-    HpBarWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
-    HpBarWidgetComp->SetDrawSize(FVector2D(100.0f, 15.0f));
-    HpBarWidgetComp->SetRelativeLocation(FVector(0.0f, 0.0f, 100.0f));
-
-        // ¸Þ½Ã Ãæµ¹¿¬»ê Á¦¿Ü
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComp"));
     SkeletalMeshComp->SetupAttachment(RootComponent);
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    // Horde scale: offscreen monsters skip pose evaluation entirely.
+    SkeletalMeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 
+    // Debug HP visualization (replace with proper UI later).
+    SphereComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HpSphereComp"));
+    SphereComp->SetupAttachment(RootComponent);
+    SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-}
-
-void ANYMonsterBase::BeginPlay()
-{
-	Super::BeginPlay();
-	
-    // Stat
-    CurrentHp = MaxHp;
-
-    // UI
-    if (HpBarWidgetComp)
-    {
-        // Ä³½ºÆÃÀº µü ÇÑ¹ø¸¸ ÇÏµµ·Ï BeginPlay¿¡¼­
-        CachedHpBarWidget = Cast<UNYHpBarWidgetMonster>(HpBarWidgetComp->GetUserWidgetObject());
-
-        // ½ºÆù Á÷ÈÄ Ç®ÇÇ »óÅÂ UI ¹Ý¿µ
-        if (CachedHpBarWidget)
-        {
-            CachedHpBarWidget->UpdateHpBar(1.0f);
-        }
-    }
+    // Binds to the root capsule on registration; this actor's Tick drives every update.
+    MovementComp = CreateDefaultSubobject<UNYMonsterMovementComponent>(TEXT("MovementComp"));
 
 
 }
@@ -73,71 +68,604 @@ void ANYMonsterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-    // Navmesh ´ë½Å º¤ÅÍÀÌµ¿
-    if (TargetActor != nullptr)
+	if (CurrentHp <= 0.0f || !MovementComp)
+	{
+		return;
+	}
+
+    const bool bKnockbackActive = MovementComp->UpdateKnockback(DeltaTime);
+
+    // Dead/destroyed target: don't walk in. Server retargets from GameMode (death/logout).
+    if (!IsChaseTargetValid(ActivationData.Target))
     {
-        FVector Direction = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+        if (bKnockbackActive)
+        {
+            MovementComp->UpdateGroundedVertical(DeltaTime);
+        }
+        else
+        {
+            // UpdateKnockback() zeroed the velocity, so the monster goes back to sleep here.
+            RefreshTickState();
+        }
 
-        // SweepÀ» true·Î ÁÖ¾î ¸ó½ºÅÍ³¢¸® °ãÄ¡´Â °Í ¹æÁö
-        AddActorWorldOffset(Direction * MoveSpeed * DeltaTime, true);
-
-        // ºÎµå·¯¿î ½Ã¼± È¸Àü º¸°£
-        FRotator TargetRotation = Direction.Rotation();
-        SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
+        MovementComp->PublishFrameVelocity(DeltaTime);
+        return;
     }
-}
 
-// ¼­¹ö¿¡¼­ ½ºÆù Á÷ÈÄ È£Ãâ
-void ANYMonsterBase::SetTarget(AActor* NewTarget)
-{
-    if (HasAuthority())
+    if (!IsStaggered())
     {
-        TargetActor = NewTarget;
+        // Horizontal seek only â€” vertical is owned by UpdateGroundedVertical (no navmesh).
+        const FVector ToTarget = ActivationData.Target->GetActorLocation() - GetActorLocation();
+        FVector Direction = ToTarget.GetSafeNormal2D();
+
+        // Constant per-monster lean off the straight line, so the horde spreads instead of
+        // funnelling into one point. Derived from the replicated seed, unlike a per-frame draw.
+        Direction = Direction.RotateAngleAxis(ApproachAngleOffset, FVector::UpVector);
+
+        // Position holds still once within attack range (or mid-attack); facing keeps tracking the target.
+        // Without this, a ranged monster would keep closing to melee distance between attacks.
+        const bool bWithinAttackRange = ToTarget.SizeSquared2D() <= FMath::Square(AttackRange);
+        if (!IsAttacking() && !bWithinAttackRange && !Direction.IsNearlyZero())
+        {
+            MovementComp->MoveHorizontal(Direction * RandomizedMoveSpeed * DeltaTime);
+        }
+
+        if (!Direction.IsNearlyZero())
+        {
+            const FRotator TargetRotation = Direction.Rotation();
+            SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, 5.0f));
+        }
     }
 
+    MovementComp->UpdateGroundedVertical(DeltaTime);
+    MovementComp->PublishFrameVelocity(DeltaTime);
 }
 
 void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(ANYMonsterBase, TargetActor);
+    DOREPLIFETIME(ANYMonsterBase, ActivationData);
     DOREPLIFETIME(ANYMonsterBase, CurrentHp);
 }
 
-// ¾ð¸®¾ó ³»Àå µ¥¹ÌÁö Ã³¸® ÇÔ¼ö ¿À¹ö¶óÀÌµå
+void ANYMonsterBase::BeginPlay()
+{
+	Super::BeginPlay();
+	
+    CurrentHp = MaxHp;
+    LastObservedHp = CurrentHp;
+
+    // A shorter interval would cut the swing off before the longest variant finishes playing.
+    for (const UAnimMontage* Montage : AttackMontages)
+    {
+        if (Montage)
+        {
+            AttackInterval = FMath::Max(AttackInterval, Montage->GetPlayLength());
+        }
+    }
+}
+
+bool ANYMonsterBase::ShouldTick() const
+{
+    // A pooled or dead monster has nothing to simulate; a corpse still renders its death animation.
+    if (!ActivationData.bIsActive || CurrentHp <= 0.0f)
+    {
+        return false;
+    }
+
+    // Seeking runs per frame. An idle monster only wakes up for the length of a knockback slide.
+    return ActivationData.Target != nullptr || (MovementComp && MovementComp->HasActiveKnockback());
+}
+
+void ANYMonsterBase::RefreshTickState()
+{
+    SetActorTickEnabled(ShouldTick());
+}
+
+// Stat
 float ANYMonsterBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-    // Ã¼·Â ±ð±â´Â ¹«Á¶°Ç ¼­¹ö¿¡¼­¸¸
     if (!HasAuthority())
         return 0.0f;
 
-    CurrentHp -= DamageAmount;
+    // Corpses are still visible during the death animation, so reject damage that would kill twice.
+    if (bIsDying)
+        return 0.0f;
 
+    CurrentHp -= DamageAmount;
     OnRep_CurrentHp();
 
     if (CurrentHp <= 0.0f)
     {
-        // TODO : °æÇèÄ¡ º¸¼® ½ºÆù ·ÎÁ÷ È£Ãâ
-        
-
-        if (ANYGameMode* GM = Cast<ANYGameMode>(GetWorld()->GetAuthGameMode()))
-        {
-            GM->OnEnemyKilled();
-        }
-        
-        Destroy();
+        StartDeathOnServer(EventInstigator);
     }
 
     return DamageAmount;
 }
 
+void ANYMonsterBase::SetMaxHpOnServer(float NewMaxHp)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    MaxHp = FMath::Max(1.0f, NewMaxHp);
+    CurrentHp = MaxHp;
+    OnRep_CurrentHp();
+}
+
 void ANYMonsterBase::OnRep_CurrentHp()
 {
-    // Ä³½ÌµÈ Æ÷ÀÎÅÍ¸¦ »ç¿ëÇØ Çüº¯È¯ ¾øÀÌ Áï½Ã UI °»½Å
-    if (CachedHpBarWidget)
+    if (GetNetMode() != NM_DedicatedServer)
     {
-        float HpPercentage = CurrentHp / MaxHp;
-        CachedHpBarWidget->UpdateHpBar(HpPercentage);
+        OnHpChanged(CurrentHp, MaxHp);
+    }
+
+    // Only a drop is a hit; a rise means the pool refilled this monster.
+    // Hits landed between two net updates arrive coalesced into a single reaction.
+    const float DamageTaken = LastObservedHp - CurrentHp;
+    LastObservedHp = CurrentHp;
+
+    if (DamageTaken > 0.0f)
+    {
+        // Stagger/knockback are for living monsters. A corpse should not slide.
+        if (CurrentHp > 0.0f)
+        {
+            // Gameplay runs everywhere, including a dedicated server, so the authoritative
+            // position stays in step with what players are looking at.
+            BeginStagger();
+            BeginKnockback();
+        }
+
+        if (GetNetMode() != NM_DedicatedServer)
+        {
+            OnHitFeedback(DamageTaken);
+        }
+    }
+
+    // Runs on server and clients: a corpse keeps rendering but stops colliding and seeking.
+    if (CurrentHp <= 0.0f && ActivationData.bIsActive)
+    {
+        // Attack (and the hurt montage from OnHitFeedback) occupy the slot until stopped.
+        // Without this, AnimGraph death waits for the attack montage to finish.
+        if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.15f);
+        }
+
+        if (GetNetMode() != NM_DedicatedServer)
+        {
+            OnDeathFeedback();
+        }
+
+        SetActorEnableCollision(false);
+        RefreshTickState();
+    }
+}
+
+
+// Death
+void ANYMonsterBase::StartDeathOnServer(AController* KillerController)
+{
+    if (!HasAuthority() || bIsDying)
+    {
+        return;
+    }
+
+    bIsDying = true;
+    StopAttackOnServer();
+
+    // Kill count and rewards are granted immediately; only the cleanup waits for the animation.
+    if (INYMonsterLifecycleInterface* LifecycleHost = GetLifecycleHost())
+    {
+        LifecycleHost->NotifyMonsterKilled(KillerController, this);
+    }
+
+    // NotifyMonsterKilled can end the wave, which already returned every monster to the pool.
+    if (!ActivationData.bIsActive)
+    {
+        bIsDying = false;
+        return;
+    }
+
+    if (DeathDuration <= 0.0f)
+    {
+        FinishDeathOnServer();
+        return;
+    }
+
+    GetWorldTimerManager().SetTimer(DeathTimerHandle, this, &ANYMonsterBase::FinishDeathOnServer, DeathDuration, false);
+}
+
+void ANYMonsterBase::StopAttackOnServer()
+{
+    // Server-only: OnRep_ActivationData only ever sets these timers under HasAuthority().
+    ClearAttackTimers();
+}
+
+void ANYMonsterBase::FinishDeathOnServer()
+{
+    if (!HasAuthority() || !bIsDying)
+    {
+        return;
+    }
+
+    bIsDying = false;
+
+    // What a corpse becomes is the host's call: Stage pools it, Training resets it in place.
+    // Only when nobody claims it does the monster clean itself up.
+    if (INYMonsterLifecycleInterface* LifecycleHost = GetLifecycleHost())
+    {
+        if (LifecycleHost->ReclaimMonster(this))
+        {
+            return;
+        }
+    }
+
+    Destroy();
+}
+
+INYMonsterLifecycleInterface* ANYMonsterBase::GetLifecycleHost() const
+{
+    const UWorld* World = GetWorld();
+
+    return World ? Cast<INYMonsterLifecycleInterface>(World->GetAuthGameMode()) : nullptr;
+}
+
+
+// Multiplay
+void ANYMonsterBase::ActivateOnServer(AActor* NewTarget, FVector StartLocation)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    CurrentHp = MaxHp;
+
+    // Server snaps once; clients receive the floored Z via ActivationData.SpawnLocation.
+    const FVector SnappedLocation = MovementComp ? MovementComp->SnapLocationToFloor(StartLocation) : StartLocation;
+    SetActorLocation(SnappedLocation);
+    SetNetDormancy(DORM_Awake);
+
+    FMonsterActivationData NewData;
+    NewData.bIsActive = true;
+    NewData.Target = NewTarget;
+    NewData.SpawnLocation = SnappedLocation;
+    NewData.MoveSeed = static_cast<uint8>(FMath::RandRange(0, 255));
+    ActivationData = NewData;
+
+    OnRep_ActivationData();
+}
+
+void ANYMonsterBase::RetargetOrIdleOnServer()
+{
+    if (!HasAuthority() || !ActivationData.bIsActive)
+    {
+        return;
+    }
+
+    TArray<ANYCharacterPlayer*> AlivePlayers;
+    if (const ANYGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState<ANYGameStateBase>() : nullptr)
+    {
+        for (APlayerState* PS : GS->PlayerArray)
+        {
+            const ANYPlayerStateStage* StagePS = Cast<ANYPlayerStateStage>(PS);
+            if (!StagePS || StagePS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+            {
+                continue;
+            }
+
+            if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(StagePS->GetPawn()))
+            {
+                AlivePlayers.Add(Character);
+            }
+        }
+    }
+
+    AActor* NewTarget = AlivePlayers.IsEmpty()
+        ? nullptr
+        : AlivePlayers[FMath::RandRange(0, AlivePlayers.Num() - 1)];
+
+    if (ActivationData.Target == NewTarget)
+    {
+        return;
+    }
+
+    FMonsterActivationData NewData = ActivationData;
+    NewData.Target = NewTarget;
+    ActivationData = NewData;
+
+    ForceNetUpdate();
+    ApplyChaseStateFromTarget();
+}
+
+void ANYMonsterBase::DeactivateOnServer()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    // A wave can end mid-death; drop the pending return so the monster is not pooled twice.
+    GetWorldTimerManager().ClearTimer(DeathTimerHandle);
+    bIsDying = false;
+
+    SetNetDormancy(DORM_DormantAll);
+
+    FMonsterActivationData NewData;
+    NewData.bIsActive = false;
+    NewData.Target = nullptr;
+    NewData.SpawnLocation = FVector::ZeroVector;
+    ActivationData = NewData;
+
+    OnRep_ActivationData();
+}
+
+void ANYMonsterBase::OnRep_ActivationData()
+{
+    if (ActivationData.bIsActive)
+    {
+        // Skip the spawn snap when only Target changed; otherwise clients teleport back to spawn.
+        if (!bHasAppliedActivePose)
+        {
+            // Apply authoritative spawn position on clients (movement is not replicated).
+            // ClearHitState() below drops the motion left over from the previous life.
+            SetActorLocation(ActivationData.SpawnLocation);
+
+            SetActorHiddenInGame(false);
+            SetActorEnableCollision(true);
+
+            ClearHitState();
+
+            // Both values come from the replicated seed, so every machine walks this monster
+            // the same way. The golden ratio keeps the angle from tracking the speed.
+            const float SpeedAlpha = ActivationData.MoveSeed / 255.0f;
+            const float AngleAlpha = FMath::Frac(ActivationData.MoveSeed * 0.6180339887f);
+
+            RandomizedMoveSpeed = MoveSpeed * FMath::Lerp(0.8f, 1.2f, SpeedAlpha);
+            ApproachAngleOffset = FMath::Lerp(-MaxApproachAngleOffset, MaxApproachAngleOffset, AngleAlpha);
+
+            OnRep_CurrentHp();
+            bHasAppliedActivePose = true;
+        }
+    }
+    else
+    {
+        bHasAppliedActivePose = false;
+
+        // Pooled reuse: a hit montage left mid-blend would resume on the next activation.
+        if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
+        {
+            AnimInstance->StopAllMontages(0.0f);
+        }
+
+        ClearHitState();
+
+        SetActorHiddenInGame(true);
+        SetActorEnableCollision(false);
+    }
+
+    ApplyChaseStateFromTarget();
+}
+
+bool ANYMonsterBase::IsChaseTargetValid(const AActor* Target)
+{
+    if (!IsValid(Target))
+    {
+        return false;
+    }
+
+    const ANYCharacterPlayer* Player = Cast<ANYCharacterPlayer>(Target);
+    if (!Player)
+    {
+        return false;
+    }
+
+    const ANYPlayerStateStage* PS = Player->GetPlayerState<ANYPlayerStateStage>();
+    
+    return PS && PS->GetPlayerPhase() == ENYPlayerPhase::Alive;
+}
+
+void ANYMonsterBase::ApplyChaseStateFromTarget()
+{
+    if (ActivationData.Target != nullptr)
+    {
+        // Server: only the authority ever ticks its own attack timer.
+        if (HasAuthority())
+        {
+            GetWorldTimerManager().ClearTimer(AttackCommitTimerHandle);
+            GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ANYMonsterBase::ProcessAttack, FMath::Max(AttackInterval, 0.01f), true);
+        }
+    }
+    else
+    {
+        ClearAttackTimers();
+    }
+
+    // Last, so ShouldTick() reads the state both branches above have finished settling.
+    RefreshTickState();
+}
+
+
+// Hit Reaction
+bool ANYMonsterBase::IsStaggered() const
+{
+    const UWorld* World = GetWorld();
+    return World && World->GetTimeSeconds() < StaggerEndTime;
+}
+
+void ANYMonsterBase::BeginStagger()
+{
+    if (const UWorld* World = GetWorld())
+    {
+        StaggerEndTime = World->GetTimeSeconds() + StaggerDuration;
+    }
+
+    if (HasAuthority())
+    {
+        GetWorldTimerManager().ClearTimer(AttackCommitTimerHandle);
+    }
+}
+
+void ANYMonsterBase::BeginKnockback()
+{
+    // The attacker is not replicated, but the chase target is. In a top-down horde the
+    // player being chased is almost always the one landing the hit, so push away from them.
+    const AActor* Target = ActivationData.Target;
+    if (!IsValid(Target) || !MovementComp)
+    {
+        return;
+    }
+
+    MovementComp->BeginKnockback(Target->GetActorLocation());
+
+    // An idle monster has its tick off; the slide needs it back for a moment.
+    RefreshTickState();
+}
+
+void ANYMonsterBase::ClearHitState()
+{
+    StaggerEndTime = 0.0f;
+
+    if (MovementComp)
+    {
+        MovementComp->ResetMotion();
+    }
+}
+
+// Attack
+bool ANYMonsterBase::CanAttack() const
+{
+    if (!IsChaseTargetValid(ActivationData.Target))
+    {
+        return false;
+    }
+
+    if (IsStaggered())
+    {
+        return false;
+    }
+
+    const float DistSq = FVector::DistSquaredXY(GetActorLocation(), ActivationData.Target->GetActorLocation());
+    return DistSq <= FMath::Square(AttackRange);
+}
+
+void ANYMonsterBase::ProcessAttack()
+{
+    if (!CanAttack())
+    {
+        return;
+    }
+
+    UAnimMontage* ChosenMontage = AttackMontages.Num() > 0
+        ? AttackMontages[FMath::RandRange(0, AttackMontages.Num() - 1)]
+        : nullptr;
+
+    Multicast_OnAttackStarted(ChosenMontage);
+
+    const float CommitDelay = GetAttackCommitDelay(ChosenMontage, AttackCommitNotifyName);
+    if (CommitDelay > 0.0f)
+    {
+        GetWorldTimerManager().SetTimer(
+            AttackCommitTimerHandle,
+            this,
+            &ANYMonsterBase::CommitAttackOnServer,
+            CommitDelay,
+            false);
+    }
+    else
+    {
+        CommitAttackOnServer();
+    }
+}
+
+void ANYMonsterBase::CommitAttackOnServer()
+{
+    // Server: windup finished. Skip if the monster died, pooled, or lost its target during the delay.
+    if (!HasAuthority() || CurrentHp <= 0.0f || !ActivationData.bIsActive || !IsChaseTargetValid(ActivationData.Target))
+    {
+        return;
+    }
+
+    PerformAttack();
+}
+
+void ANYMonsterBase::ClearAttackTimers()
+{
+    GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+    GetWorldTimerManager().ClearTimer(AttackCommitTimerHandle);
+}
+
+float ANYMonsterBase::GetAttackCommitDelay(const UAnimMontage* Montage, FName NotifyName)
+{
+    if (!Montage || NotifyName.IsNone())
+    {
+        return 0.0f;
+    }
+
+    for (const FAnimNotifyEvent& Event : Montage->Notifies)
+    {
+        if (Event.NotifyName == NotifyName)
+        {
+            return FMath::Max(Event.GetTriggerTime(), 0.0f);
+        }
+    }
+
+    for (const FSlotAnimationTrack& SlotTrack : Montage->SlotAnimTracks)
+    {
+        for (const FAnimSegment& Segment : SlotTrack.AnimTrack.AnimSegments)
+        {
+            const UAnimSequenceBase* Sequence = Segment.GetAnimReference();
+            if (!Sequence)
+            {
+                continue;
+            }
+
+            for (const FAnimNotifyEvent& Event : Sequence->Notifies)
+            {
+                if (Event.NotifyName != NotifyName)
+                {
+                    continue;
+                }
+
+                const float MontageTime = Segment.StartPos
+                    + (Event.GetTriggerTime() - Segment.AnimStartTime) / Segment.GetValidPlayRate();
+                return FMath::Max(MontageTime, 0.0f);
+            }
+        }
+    }
+
+    return 0.0f;
+}
+
+bool ANYMonsterBase::IsAttacking() const
+{
+    const UWorld* World = GetWorld();
+    
+    return World && World->GetTimeSeconds() < AttackEndTime;
+}
+
+// NetMulticast
+void ANYMonsterBase::Multicast_OnAttackStarted_Implementation(UAnimMontage* MontageToPlay)
+{
+    // Runs on every machine, including the server, so the local seek simulation freezes in step.
+    if (const UWorld* World = GetWorld())
+    {
+        const float FreezeDuration = MontageToPlay ? MontageToPlay->GetPlayLength() : AttackFreezeDuration;
+        AttackEndTime = World->GetTimeSeconds() + FreezeDuration;
+    }
+
+    // Montage playback is presentation only; a dedicated server has nothing to render.
+    if (GetNetMode() == NM_DedicatedServer || !MontageToPlay)
+    {
+        return;
+    }
+
+    if (UAnimInstance* AnimInstance = SkeletalMeshComp ? SkeletalMeshComp->GetAnimInstance() : nullptr)
+    {
+        AnimInstance->Montage_Play(MontageToPlay);
     }
 }

@@ -14,18 +14,24 @@
 ANYAttackMonsterRanged::ANYAttackMonsterRanged()
 {
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-	RootComponent = SphereComp;
+	SetRootComponent(SphereComp);
 	SphereComp->InitSphereRadius(15.0f);
 	SphereComp->SetCollisionProfileName(PROFILE_MONSTER_ATTACK);
 
+	StaticMeshComp->SetupAttachment(RootComponent);
+
 	ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
 	ProjectileMovementComp->InitialSpeed = 800.0f;
-	ProjectileMovementComp->MaxSpeed = 800.0f;
-	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
+	// Unlimited: SetLaunchVelocity supplies the actual speed, and a lobbed arc can exceed this otherwise.
+	ProjectileMovementComp->MaxSpeed = 0.0f;
+	ProjectileMovementComp->ProjectileGravityScale = 1.0f;
 
-	InitialLifeSpan = 5.0f; // 5초 뒤 자동 소멸
+	InitialLifeSpan = 5.0f;
+}
 
-
+void ANYAttackMonsterRanged::SetLaunchVelocity(const FVector& InVelocity)
+{
+	ProjectileMovementComp->Velocity = InVelocity;
 }
 
 void ANYAttackMonsterRanged::BeginPlay()
@@ -40,6 +46,8 @@ void ANYAttackMonsterRanged::BeginPlay()
 
 }
 
+
+// Attack
 void ANYAttackMonsterRanged::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (HasAuthority())
