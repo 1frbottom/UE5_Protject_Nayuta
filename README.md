@@ -24,7 +24,8 @@
 | `LV_Lobby` | Listen Server 로비. 스테이지로 Seamless Travel |
 | `LV_Stage1` | 웨이브 전투, 몬스터 풀, 보상 페이즈 |
 | `LV_TrainingRoom` | 무기·전투 샌드박스 |
-<br>
+
+
 **구현 예정**
 
 * **UI / UX :** 메인메뉴 및 기타 UI 외관
