@@ -35,8 +35,6 @@
 * **사운드 :** 기타 사운드
 
 <br><br>
----
-<br><br>
 
 ## 주요 클래스
 
@@ -50,12 +48,9 @@
 | [NYStageContentRegistry](Source/ProjectNayuta/Data/NYStageContentRegistry.h) | 데이터 테이블 → 몬스터 정의 해석 |
 
 <br><br>
----
-<br><br>
 
 ## 실행방법
 
 //
 
 <br><br>
----
