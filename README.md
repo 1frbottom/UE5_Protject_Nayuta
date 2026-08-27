@@ -9,7 +9,9 @@
 * **개발 인원 :** 1명
 * **엔진 및 언어 :** Unreal Engine 5.4 / C++
 * **플랫폼 :** PC (Windows)
+
 <br><br>
+
 ---
 
 ## 현재 상태
@@ -23,14 +25,14 @@
 | `LV_Stage1` | 웨이브 전투, 몬스터 풀, 보상 페이즈 |
 | `LV_TrainingRoom` | 무기·전투 샌드박스 |
 <br>
-**미구현**
-* 메인메뉴 외관
-* 기타 UI 외관
-* 웨이브 스케일링
-* 플레이어 공격 애니메이션
-* 전투 피드백
-* 기타 사운드
+**구현 예정**
+
+* **UI / UX :** 메인메뉴 및 기타 UI 외관
+* **전투 시스템 :** 플레이어 공격 애니메이션, 전투 피드백
+* **웨이브 밸런스 :** 스케일링
+* **사운드 :** 기타 사운드
 <br><br>
+
 ---
 
 ## 주요 클래스
@@ -44,6 +46,7 @@
 | [NYWeaponComponent](Source/ProjectNayuta/Weapons/NYWeaponComponent.h) | 무기 슬롯·레벨 복제 |
 | [NYStageContentRegistry](Source/ProjectNayuta/Data/NYStageContentRegistry.h) | 데이터 테이블 → 몬스터 정의 해석 |
 <br><br>
+
 ---
 
 ## 실행방법
@@ -51,4 +54,5 @@
 
 
 <br><br>
+
 ---
