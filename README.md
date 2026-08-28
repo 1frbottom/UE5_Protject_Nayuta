@@ -1,8 +1,10 @@
 # [UE5 4인 협동 로그라이크]
 
 <p align="center">
-  <img src="데모_GIF_또는_이미지_URL" width="600" />
+  <img src="https://github.com/user-attachments/assets/e763eb87-4000-430b-afca-d9a05946055c" width="600" />
 </p>
+
+* 유튜브 [링크](https://www.youtube.com/watch?v=KwKsSuFFGsM)
 
 <br><br>
 
@@ -31,7 +33,7 @@
 
 * **UI / UX :** 메인메뉴 및 기타 UI 외관
 * **전투 시스템 :** 플레이어 공격 애니메이션, 전투 피드백
-* **웨이브 밸런스 :** 스케일링
+* **웨이브 :** 스케일링
 * **사운드 :** 기타 사운드
 
 <br><br>
@@ -51,6 +53,8 @@
 
 ## 실행방법
 
-//
+* 구글드라이브 [링크](https://drive.google.com/drive/folders/1pTrk9NoL3PSQWJ5tqH26mLx6ymtuvojM?usp=drive_link)
+* 위파일 압축해제 후 Windows/ProjectNayuta.exe 실행
+* 싱글플레이, 멀티플레이(세션생성 후 스팀 친구 게임참여), 훈련장 가능
 
 <br><br>
