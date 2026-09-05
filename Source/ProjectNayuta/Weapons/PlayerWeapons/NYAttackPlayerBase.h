@@ -20,6 +20,7 @@ protected:
 
 	void TryHideHeldWeaponMesh();
 	void TryRestoreHeldWeaponMesh();
+	void PlayAttackSound();
 
 	bool bHidHeldWeaponMesh = false;
 

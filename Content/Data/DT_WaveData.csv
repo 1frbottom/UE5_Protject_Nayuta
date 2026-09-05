@@ -1,4 +1,4 @@
 ---,BaseTargetKillCnt,SpawnInterval,MonsterType,SpawnCountPerTick,SpawnRadius
-1,10,10,Melee,50,2000
-2,99999,1,Melee,200,3000
-3,20,3,Ranged,15,1000
+1,5,5,Melee,10,2000
+2,7,4,Ranged,15,2500
+3,10,3,Melee,20,2000

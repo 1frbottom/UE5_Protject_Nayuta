@@ -377,7 +377,13 @@ void UNYWeaponComponent::SpawnAttackToward(ANYMonsterBase* TargetMonster)
 	}
 
 	const FVector StartLoc = GetOwner()->GetActorLocation();
-	const FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
+	FVector Direction = TargetMonster->GetActorLocation() - StartLoc;
+	Direction.Z = 0.0f;
+	if (!Direction.Normalize())
+	{
+		Direction = OwnerPawn->GetActorForwardVector().GetSafeNormal2D();
+	}
+
 	const FRotator SpawnRotation = Direction.Rotation();
 	const FVector SpawnLocation = StartLoc + (Direction * 50.0f);
 	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);

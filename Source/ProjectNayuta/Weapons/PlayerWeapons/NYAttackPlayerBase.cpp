@@ -4,7 +4,9 @@
 #include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
 
 #include "Components/ShapeComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "ProjectNayuta.h"
+#include "Sound/SoundBase.h"
 
 #include "Characters/CharacterPlayers/NYCharacterPlayer.h"
 #include "Weapons/NYWeaponComponent.h"
@@ -24,6 +26,7 @@ void ANYAttackPlayerBase::BeginPlay()
 	}
 
 	TryHideHeldWeaponMesh();
+	PlayAttackSound();
 }
 
 void ANYAttackPlayerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -67,4 +70,23 @@ void ANYAttackPlayerBase::TryRestoreHeldWeaponMesh()
 	}
 
 	bHidHeldWeaponMesh = false;
+}
+
+void ANYAttackPlayerBase::PlayAttackSound()
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	const ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetInstigator());
+	const UNYWeaponComponent* WeaponComp = Character ? Character->GetWeaponComponent() : nullptr;
+	const UNYWeaponDefinition* Definition =
+		WeaponComp ? WeaponComp->GetPrimarySlot().Definition.Get() : nullptr;
+	if (!Definition || !Definition->AttackSound)
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySoundAtLocation(this, Definition->AttackSound, GetActorLocation());
 }
