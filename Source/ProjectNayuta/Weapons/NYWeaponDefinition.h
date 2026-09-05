@@ -8,6 +8,7 @@
 #include "NYWeaponDefinition.generated.h"
 
 class ANYAttackPlayerBase;
+class UAnimMontage;
 class UStaticMesh;
 class UTexture2D;
 
@@ -28,6 +29,10 @@ public:
 	/** Held weapon visual on the character mesh. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<UStaticMesh> WeaponMesh = nullptr;
+
+	/** Character attack montage. Played on the pawn mesh UpperBody slot; leave empty for VFX-only attacks. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	TObjectPtr<UAnimMontage> AttackMontage = nullptr;
 
 	/** Key into WeaponLevelDataTable rows (e.g. "Sword", "Axe"). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")

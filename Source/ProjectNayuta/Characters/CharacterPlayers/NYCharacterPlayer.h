@@ -15,6 +15,7 @@ class UCameraComponent;
 class UInputComponent;
 class UInputAction;
 class UStaticMeshComponent;
+class UAnimMontage;
 class UNYWeaponComponent;
 
 UCLASS()
@@ -167,6 +168,9 @@ public:
 
 	void ResetWeaponForNewRun();
 
+	/** Server: play the primary weapon attack montage on every machine that renders this pawn. */
+	void PlayAttackMontage(UAnimMontage* MontageToPlay);
+
 	/** Ref-counted hide for thrown attacks; safe if multiple projectiles overlap. */
 	void PushHeldWeaponMeshHidden();
 	void PopHeldWeaponMeshHidden();
@@ -185,6 +189,13 @@ protected:
 	void RefreshHeldWeaponMeshVisibility();
 
 	int32 HeldWeaponMeshHideCount = 0;
+
+	/**
+	 * Presentation only (montage). Fires on every machine that renders this pawn,
+	 * never on a dedicated server.
+	 */
+	UFUNCTION(NetMulticast, Unreliable, Category = "Attack")
+	void Multicast_OnAttackStarted(UAnimMontage* MontageToPlay);
 
 
 

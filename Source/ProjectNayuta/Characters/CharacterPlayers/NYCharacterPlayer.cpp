@@ -30,6 +30,7 @@
 #include "Weapons/NYWeaponDefinition.h"
 
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 
 
@@ -486,6 +487,17 @@ void ANYCharacterPlayer::ResetWeaponForNewRun()
     }
 }
 
+void ANYCharacterPlayer::PlayAttackMontage(UAnimMontage* MontageToPlay)
+{
+    // Server
+    if (!HasAuthority() || !MontageToPlay || bIsDead)
+    {
+        return;
+    }
+
+    Multicast_OnAttackStarted(MontageToPlay);
+}
+
 void ANYCharacterPlayer::UpdateWeaponVisual()
 {
 	if (!WeaponMeshComp || !DefaultWeaponComp)
@@ -517,4 +529,18 @@ void ANYCharacterPlayer::RefreshHeldWeaponMeshVisibility()
 	{
 		WeaponMeshComp->SetHiddenInGame(HeldWeaponMeshHideCount > 0);
 	}
+}
+
+// NetMulticast
+void ANYCharacterPlayer::Multicast_OnAttackStarted_Implementation(UAnimMontage* MontageToPlay)
+{
+    if (GetNetMode() == NM_DedicatedServer || !MontageToPlay || bIsDead)
+    {
+        return;
+    }
+
+    if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+    {
+        AnimInstance->Montage_Play(MontageToPlay);
+    }
 }

@@ -4,11 +4,13 @@
 
 #include "ProjectNayuta.h"
 
+#include "Animation/AnimMontage.h"
 #include "Engine/OverlapResult.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Characters/CharacterPlayers/NYCharacterPlayer.h"
 #include "Game/NYGameStateStage.h"
 #include "Player/NYPlayerStateStage.h"
 
@@ -205,6 +207,7 @@ void UNYWeaponComponent::RefreshAttackTimer()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(AttackTimer);
+		World->GetTimerManager().ClearTimer(AttackCommitTimerHandle);
 	}
 
 	if (!GetOwner() || !GetOwner()->HasAuthority() || !CurrentAttackClass || CurrentCooldown <= 0.0f)
@@ -254,73 +257,183 @@ void UNYWeaponComponent::OnRep_WeaponSlots()
 
 void UNYWeaponComponent::FireAttack()
 {
-	if (!CurrentAttackClass || !GetOwner()->HasAuthority())
+	// Server
+	if (!CanFireAttack())
 	{
 		return;
 	}
 
-	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!FindNearestTargetInRange())
+	{
+		return;
+	}
+
+	UAnimMontage* MontageToPlay = PrimarySlot.Definition ? PrimarySlot.Definition->AttackMontage : nullptr;
+	if (ANYCharacterPlayer* OwnerCharacter = Cast<ANYCharacterPlayer>(GetOwner()))
+	{
+		OwnerCharacter->PlayAttackMontage(MontageToPlay);
+	}
+
+	const float CommitDelay = GetAttackCommitDelay(MontageToPlay, AttackCommitNotifyName);
+	if (CommitDelay > 0.0f)
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			AttackCommitTimerHandle,
+			this,
+			&UNYWeaponComponent::CommitAttackOnServer,
+			CommitDelay,
+			false);
+	}
+	else
+	{
+		CommitAttackOnServer();
+	}
+}
+
+void UNYWeaponComponent::CommitAttackOnServer()
+{
+	// Server: windup finished. Skip if the owner can no longer attack.
+	if (!CanFireAttack())
+	{
+		return;
+	}
+
+	ANYMonsterBase* TargetMonster = FindNearestTargetInRange();
+	if (!TargetMonster)
+	{
+		return;
+	}
+
+	SpawnAttackToward(TargetMonster);
+}
+
+bool UNYWeaponComponent::CanFireAttack() const
+{
+	if (!CurrentAttackClass || !GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return false;
+	}
+
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (!OwnerPawn)
 	{
-		return;
+		return false;
 	}
 
-	// Server: only fire while the owning player can control their pawn.
-	if (ANYPlayerStateStage* PS = OwnerPawn->GetPlayerState<ANYPlayerStateStage>())
+	if (const ANYPlayerStateStage* PS = OwnerPawn->GetPlayerState<ANYPlayerStateStage>())
 	{
-		if (!PS->CanControlPawn())
-		{
-			return;
-		}
+		return PS->CanControlPawn();
 	}
 
-	FVector StartLoc = GetOwner()->GetActorLocation();
+	return true;
+}
+
+ANYMonsterBase* UNYWeaponComponent::FindNearestTargetInRange() const
+{
+	AActor* OwnerActor = GetOwner();
+	UWorld* World = GetWorld();
+	if (!OwnerActor || !World || CurrentRange <= 0.0f)
+	{
+		return nullptr;
+	}
+
+	const FVector StartLoc = OwnerActor->GetActorLocation();
 	TArray<FOverlapResult> OverlapResults;
 	FCollisionQueryParams CollisionParams;
-	CollisionParams.AddIgnoredActor(GetOwner());
+	CollisionParams.AddIgnoredActor(OwnerActor);
 
-	GetWorld()->OverlapMultiByChannel(
+	World->OverlapMultiByChannel(
 		OverlapResults, StartLoc, FQuat::Identity, ECC_PLAYERATTACK,
 		FCollisionShape::MakeSphere(CurrentRange), CollisionParams);
 
-	if (OverlapResults.Num() > 0)
-	{
-		ANYMonsterBase* TargetMonster = nullptr;
-		float MinDistance = CurrentRange + 1.0f;
+	ANYMonsterBase* TargetMonster = nullptr;
+	float MinDistance = CurrentRange + 1.0f;
 
-		for (const FOverlapResult& Result : OverlapResults)
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
+		if (!Monster)
 		{
-			ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
-			if (Monster)
-			{
-				const float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
-				if (Distance < MinDistance)
-				{
-					MinDistance = Distance;
-					TargetMonster = Monster;
-				}
-			}
+			continue;
 		}
 
-		if (TargetMonster)
+		const float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
+		if (Distance < MinDistance)
 		{
-			const FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
-			const FRotator SpawnRotation = Direction.Rotation();
-			const FVector SpawnLocation = StartLoc + (Direction * 50.0f);
-			const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+			MinDistance = Distance;
+			TargetMonster = Monster;
+		}
+	}
 
-			ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActorDeferred<ANYAttackPlayerBase>(
-				CurrentAttackClass,
-				SpawnTransform,
-				GetOwner(),
-				OwnerPawn,
-				ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	return TargetMonster;
+}
 
-			if (SpawnedAttack)
+void UNYWeaponComponent::SpawnAttackToward(ANYMonsterBase* TargetMonster)
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!TargetMonster || !OwnerPawn || !CurrentAttackClass)
+	{
+		return;
+	}
+
+	const FVector StartLoc = GetOwner()->GetActorLocation();
+	const FVector Direction = (TargetMonster->GetActorLocation() - StartLoc).GetSafeNormal();
+	const FRotator SpawnRotation = Direction.Rotation();
+	const FVector SpawnLocation = StartLoc + (Direction * 50.0f);
+	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+
+	ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActorDeferred<ANYAttackPlayerBase>(
+		CurrentAttackClass,
+		SpawnTransform,
+		GetOwner(),
+		OwnerPawn,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+	if (SpawnedAttack)
+	{
+		SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);
+		SpawnedAttack->FinishSpawning(SpawnTransform);
+	}
+}
+
+float UNYWeaponComponent::GetAttackCommitDelay(const UAnimMontage* Montage, FName NotifyName)
+{
+	if (!Montage || NotifyName.IsNone())
+	{
+		return 0.0f;
+	}
+
+	for (const FAnimNotifyEvent& Event : Montage->Notifies)
+	{
+		if (Event.NotifyName == NotifyName)
+		{
+			return FMath::Max(Event.GetTriggerTime(), 0.0f);
+		}
+	}
+
+	for (const FSlotAnimationTrack& SlotTrack : Montage->SlotAnimTracks)
+	{
+		for (const FAnimSegment& Segment : SlotTrack.AnimTrack.AnimSegments)
+		{
+			const UAnimSequenceBase* Sequence = Segment.GetAnimReference();
+			if (!Sequence)
 			{
-				SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);
-				SpawnedAttack->FinishSpawning(SpawnTransform);
+				continue;
+			}
+
+			for (const FAnimNotifyEvent& Event : Sequence->Notifies)
+			{
+				if (Event.NotifyName != NotifyName)
+				{
+					continue;
+				}
+
+				const float MontageTime = Segment.StartPos
+					+ (Event.GetTriggerTime() - Segment.AnimStartTime) / Segment.GetValidPlayRate();
+				return FMath::Max(MontageTime, 0.0f);
 			}
 		}
 	}
+
+	return 0.0f;
 }
