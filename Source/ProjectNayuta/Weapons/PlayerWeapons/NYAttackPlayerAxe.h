@@ -28,6 +28,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UBoxComponent> BoxComp;
 
+	/** Speed is constant. Flight distance is CurrentRange (LifeSpan = Range / InitialSpeed). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovementComp;
 

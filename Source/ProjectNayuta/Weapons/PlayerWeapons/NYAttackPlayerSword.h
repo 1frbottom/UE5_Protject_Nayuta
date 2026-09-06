@@ -37,6 +37,6 @@ protected:
 
 	/** Sweep arc in degrees. 360 = full circle hit. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack", meta = (ClampMin = "10.0", ClampMax = "360.0"))
-	float MeleeSweepAngle = 360.0f;
+	float MeleeSweepAngle = 90.0f;
 
 };
