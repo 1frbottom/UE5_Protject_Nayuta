@@ -37,7 +37,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> ToggleTrainingPanelAction;
 
-	/** Local: GameOnly when panel closed (mouse look); GameAndUI when open. */
+	/** Local: IMC_InGame on. Cursor only while the training panel is open. */
 	void ApplyTrainingInputMode();
 
 	UFUNCTION(BlueprintCallable, Category = "Training")

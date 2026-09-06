@@ -8,6 +8,7 @@
 #include "NYWeaponComponent.generated.h"
 
 class ANYAttackPlayerBase;
+class UAnimMontage;
 class UNYWeaponDefinition;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNYOnWeaponLevelChanged, int32, NewLevel);
@@ -94,6 +95,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Weapon")
 	FNYOnWeaponSlotsChanged OnWeaponSlotsChanged;
 
+	/** Server: start/stop cooldown-gated fire while the owner holds attack. */
+	void SetWantsToFire(bool bNewWantsToFire);
+
+	/** Server: flattened aim used when the next attack spawns. */
+	void SetAimDirection(const FVector& NewAimDir);
+
+	FVector GetAimDirection() const;
+
 protected:
 	void ApplyWeaponDefinition();
 	void RefreshAttackTimer();
@@ -119,6 +128,32 @@ protected:
 
 	FTimerHandle AttackTimer;
 
+	/** Named notify on the attack montage for the hit/release frame.
+	 * Server reads the time from the asset and delays spawn; the notify itself must not spawn.
+	 * Missing notify = spawn at montage start. */
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	FName AttackCommitNotifyName = TEXT("AttackCommit");
+
+	/** Server-only. One-shot delay from montage start to AttackCommitNotifyName. */
+	FTimerHandle AttackCommitTimerHandle;
+
+	void StartFireTimerIfNeeded(bool bFireImmediately);
+
 	void FireAttack();
+
+	/** Server-only. Spawns the attack after the commit delay (or immediately when no notify exists). */
+	void CommitAttackOnServer();
+
+	bool CanFireAttack() const;
+	void SpawnAttackToward(const FVector& Direction);
+
+	bool bWantsToFire = false;
+	FVector AimDirection = FVector::ForwardVector;
+
+	/** Server-only. World time of the last accepted shot; gates tap-fire against the cooldown. */
+	float LastFireServerTime = -1.0f;
+
+	/** Seconds from montage start to NotifyName. 0 if the montage or notify is missing. */
+	static float GetAttackCommitDelay(const UAnimMontage* Montage, FName NotifyName);
 
 };

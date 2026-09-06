@@ -23,3 +23,28 @@ void ANYPlayerControllerInGame::RefreshPlayerHpUI()
 	const float HpPercent = (MaxHp > 0.0f) ? (PS->GetCurrHp() / MaxHp) : 0.0f;
 	UpdatePlayerHpUI(HpPercent);
 }
+
+void ANYPlayerControllerInGame::ApplyGameplayLookInput()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
+}
+
+void ANYPlayerControllerInGame::ApplyVisibleCursorGameInput()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+}

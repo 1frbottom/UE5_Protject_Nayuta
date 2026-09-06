@@ -82,8 +82,7 @@ void ANYPlayerControllerStage::ApplyInputConfig(ENYInputConfig Config)
             Subsystem->AddMappingContext(IMC_InGame, 0);
         }
 
-        SetInputMode(FInputModeGameOnly());
-        bShowMouseCursor = false;
+        ApplyGameplayLookInput();
         bIsPaused = false;
         break;
 

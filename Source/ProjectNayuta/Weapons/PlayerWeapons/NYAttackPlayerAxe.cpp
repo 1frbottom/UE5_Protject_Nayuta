@@ -21,8 +21,6 @@ ANYAttackPlayerAxe::ANYAttackPlayerAxe()
 	ProjectileMovementComp->InitialSpeed = 1000.f;
 	ProjectileMovementComp->MaxSpeed = 1000.f;
 	ProjectileMovementComp->ProjectileGravityScale = 0.0f;
-
-	InitialLifeSpan = 1.0f;
 }
 
 void ANYAttackPlayerAxe::Tick(float DeltaTime)
@@ -38,6 +36,12 @@ void ANYAttackPlayerAxe::Tick(float DeltaTime)
 void ANYAttackPlayerAxe::BeginPlay()
 {
 	Super::BeginPlay();
+
+	const float Speed = ProjectileMovementComp ? ProjectileMovementComp->InitialSpeed : 0.0f;
+	if (CurrentRange > 0.0f && Speed > 0.0f)
+	{
+		SetLifeSpan(CurrentRange / Speed);
+	}
 
 	// Server
 	if (HasAuthority())

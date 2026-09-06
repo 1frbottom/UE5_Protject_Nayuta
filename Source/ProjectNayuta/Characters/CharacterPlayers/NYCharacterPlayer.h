@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/NetSerialization.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 
@@ -15,6 +16,7 @@ class UCameraComponent;
 class UInputComponent;
 class UInputAction;
 class UStaticMeshComponent;
+class UAnimMontage;
 class UNYWeaponComponent;
 
 UCLASS()
@@ -53,6 +55,9 @@ private:
 
 	void InitPlayerState();
 
+	/** Late-joining clients can tick before PlayerState replicates; re-resolve on demand. */
+	ANYPlayerStateStage* ResolvePlayerState();
+
 
 // Camera
 protected:
@@ -61,6 +66,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> CameraComp;
+
+	void EnsureDefaultCameraPitch();
+
+	/** Initial look-down when control pitch is unset. Negative = look down at the back. */
+	UPROPERTY(EditDefaultsOnly, Category = "Camera")
+	float DefaultCameraPitch = -20.0f;
 
 // Input
 public:
@@ -98,6 +109,31 @@ protected:
 	UFUNCTION(Server, Reliable, Category = "Weapon")
 	void Server_SwapWeaponSlots();
 
+	// Attack
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> AttackAction;
+
+	void StartAttack();
+	void StopAttack();
+
+	/** Client → Server */
+	UFUNCTION(Server, Reliable, Category = "Weapon")
+	void Server_SetWantsToFire(bool bWantsToFire, FVector_NetQuantizeNormal AimDir);
+
+	/** Client → Server. Look-aim while locally controlled. */
+	UFUNCTION(Server, Unreliable, Category = "Weapon")
+	void Server_SetAimDirection(FVector_NetQuantizeNormal AimDir);
+
+	void UpdateLocalAim(float DeltaTime);
+	void ApplyAimDirection(const FVector& WorldDir);
+	FVector GetLookAimDirection() const;
+
+	FVector CachedAimDirection = FVector::ForwardVector;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input", meta = (ClampMin = "0.02", ClampMax = "0.2"))
+	float AimRepInterval = 0.05f;
+
+	float AimRepTimer = 0.0f;
 
 
 // Stat
@@ -167,6 +203,9 @@ public:
 
 	void ResetWeaponForNewRun();
 
+	/** Server: play the primary weapon attack montage on every machine that renders this pawn. */
+	void PlayAttackMontage(UAnimMontage* MontageToPlay);
+
 	/** Ref-counted hide for thrown attacks; safe if multiple projectiles overlap. */
 	void PushHeldWeaponMeshHidden();
 	void PopHeldWeaponMeshHidden();
@@ -185,6 +224,13 @@ protected:
 	void RefreshHeldWeaponMeshVisibility();
 
 	int32 HeldWeaponMeshHideCount = 0;
+
+	/**
+	 * Presentation only (montage). Fires on every machine that renders this pawn,
+	 * never on a dedicated server.
+	 */
+	UFUNCTION(NetMulticast, Unreliable, Category = "Attack")
+	void Multicast_OnAttackStarted(UAnimMontage* MontageToPlay);
 
 
 
