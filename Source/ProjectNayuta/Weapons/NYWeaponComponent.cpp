@@ -5,11 +5,9 @@
 #include "ProjectNayuta.h"
 
 #include "Animation/AnimMontage.h"
-#include "Engine/OverlapResult.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 
-#include "Characters/CharacterMonsters/NYMonsterBase.h"
 #include "Characters/CharacterPlayers/NYCharacterPlayer.h"
 #include "Game/NYGameStateStage.h"
 #include "Player/NYPlayerStateStage.h"
@@ -210,13 +208,98 @@ void UNYWeaponComponent::RefreshAttackTimer()
 		World->GetTimerManager().ClearTimer(AttackCommitTimerHandle);
 	}
 
-	if (!GetOwner() || !GetOwner()->HasAuthority() || !CurrentAttackClass || CurrentCooldown <= 0.0f)
+	StartFireTimerIfNeeded(false);
+}
+
+void UNYWeaponComponent::SetWantsToFire(bool bNewWantsToFire)
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
 	{
 		return;
 	}
 
-	GetWorld()->GetTimerManager().SetTimer(
-		AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true);
+	if (bWantsToFire == bNewWantsToFire)
+	{
+		return;
+	}
+
+	bWantsToFire = bNewWantsToFire;
+
+	if (!bWantsToFire)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(AttackTimer);
+		}
+		return;
+	}
+
+	StartFireTimerIfNeeded(true);
+}
+
+void UNYWeaponComponent::SetAimDirection(const FVector& NewAimDir)
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	FVector Flattened = NewAimDir;
+	Flattened.Z = 0.0f;
+	if (Flattened.Normalize())
+	{
+		AimDirection = Flattened;
+	}
+}
+
+FVector UNYWeaponComponent::GetAimDirection() const
+{
+	if (AimDirection.SizeSquared2D() > KINDA_SMALL_NUMBER)
+	{
+		return AimDirection;
+	}
+
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+	{
+		const FVector Forward = OwnerPawn->GetActorForwardVector().GetSafeNormal2D();
+		if (!Forward.IsNearlyZero())
+		{
+			return Forward;
+		}
+	}
+
+	return FVector::ForwardVector;
+}
+
+void UNYWeaponComponent::StartFireTimerIfNeeded(bool bFireImmediately)
+{
+	// Server
+	UWorld* World = GetWorld();
+	if (!World || !GetOwner() || !GetOwner()->HasAuthority() || !bWantsToFire || !CurrentAttackClass || CurrentCooldown <= 0.0f)
+	{
+		return;
+	}
+
+	// Tapping must not bypass the cooldown: hold back the first shot by whatever is left of it.
+	float FirstDelay = CurrentCooldown;
+	if (bFireImmediately)
+	{
+		const float Elapsed = (LastFireServerTime < 0.0f)
+			? CurrentCooldown
+			: (World->GetTimeSeconds() - LastFireServerTime);
+		FirstDelay = FMath::Clamp(CurrentCooldown - Elapsed, 0.0f, CurrentCooldown);
+	}
+
+	if (FirstDelay <= 0.0f)
+	{
+		FireAttack();
+		FirstDelay = CurrentCooldown;
+	}
+
+	World->GetTimerManager().SetTimer(
+		AttackTimer, this, &UNYWeaponComponent::FireAttack, CurrentCooldown, true, FirstDelay);
 }
 
 void UNYWeaponComponent::NotifyWeaponLevelChanged()
@@ -258,15 +341,18 @@ void UNYWeaponComponent::OnRep_WeaponSlots()
 void UNYWeaponComponent::FireAttack()
 {
 	// Server
-	if (!CanFireAttack())
+	UWorld* World = GetWorld();
+	if (!World || !CanFireAttack())
 	{
 		return;
 	}
 
-	if (!FindNearestTargetInRange())
+	if (World->GetTimerManager().IsTimerActive(AttackCommitTimerHandle))
 	{
 		return;
 	}
+
+	LastFireServerTime = World->GetTimeSeconds();
 
 	UAnimMontage* MontageToPlay = PrimarySlot.Definition ? PrimarySlot.Definition->AttackMontage : nullptr;
 	if (ANYCharacterPlayer* OwnerCharacter = Cast<ANYCharacterPlayer>(GetOwner()))
@@ -277,7 +363,7 @@ void UNYWeaponComponent::FireAttack()
 	const float CommitDelay = GetAttackCommitDelay(MontageToPlay, AttackCommitNotifyName);
 	if (CommitDelay > 0.0f)
 	{
-		GetWorld()->GetTimerManager().SetTimer(
+		World->GetTimerManager().SetTimer(
 			AttackCommitTimerHandle,
 			this,
 			&UNYWeaponComponent::CommitAttackOnServer,
@@ -298,13 +384,7 @@ void UNYWeaponComponent::CommitAttackOnServer()
 		return;
 	}
 
-	ANYMonsterBase* TargetMonster = FindNearestTargetInRange();
-	if (!TargetMonster)
-	{
-		return;
-	}
-
-	SpawnAttackToward(TargetMonster);
+	SpawnAttackToward(GetAimDirection());
 }
 
 bool UNYWeaponComponent::CanFireAttack() const
@@ -328,64 +408,24 @@ bool UNYWeaponComponent::CanFireAttack() const
 	return true;
 }
 
-ANYMonsterBase* UNYWeaponComponent::FindNearestTargetInRange() const
-{
-	AActor* OwnerActor = GetOwner();
-	UWorld* World = GetWorld();
-	if (!OwnerActor || !World || CurrentRange <= 0.0f)
-	{
-		return nullptr;
-	}
-
-	const FVector StartLoc = OwnerActor->GetActorLocation();
-	TArray<FOverlapResult> OverlapResults;
-	FCollisionQueryParams CollisionParams;
-	CollisionParams.AddIgnoredActor(OwnerActor);
-
-	World->OverlapMultiByChannel(
-		OverlapResults, StartLoc, FQuat::Identity, ECC_PLAYERATTACK,
-		FCollisionShape::MakeSphere(CurrentRange), CollisionParams);
-
-	ANYMonsterBase* TargetMonster = nullptr;
-	float MinDistance = CurrentRange + 1.0f;
-
-	for (const FOverlapResult& Result : OverlapResults)
-	{
-		ANYMonsterBase* Monster = Cast<ANYMonsterBase>(Result.GetActor());
-		if (!Monster)
-		{
-			continue;
-		}
-
-		const float Distance = FVector::Dist(StartLoc, Monster->GetActorLocation());
-		if (Distance < MinDistance)
-		{
-			MinDistance = Distance;
-			TargetMonster = Monster;
-		}
-	}
-
-	return TargetMonster;
-}
-
-void UNYWeaponComponent::SpawnAttackToward(ANYMonsterBase* TargetMonster)
+void UNYWeaponComponent::SpawnAttackToward(const FVector& Direction)
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!TargetMonster || !OwnerPawn || !CurrentAttackClass)
+	if (!OwnerPawn || !CurrentAttackClass)
 	{
 		return;
 	}
 
-	const FVector StartLoc = GetOwner()->GetActorLocation();
-	FVector Direction = TargetMonster->GetActorLocation() - StartLoc;
-	Direction.Z = 0.0f;
-	if (!Direction.Normalize())
+	FVector FlatDirection = Direction;
+	FlatDirection.Z = 0.0f;
+	if (!FlatDirection.Normalize())
 	{
-		Direction = OwnerPawn->GetActorForwardVector().GetSafeNormal2D();
+		FlatDirection = GetAimDirection();
 	}
 
-	const FRotator SpawnRotation = Direction.Rotation();
-	const FVector SpawnLocation = StartLoc + (Direction * 50.0f);
+	const FVector StartLoc = GetOwner()->GetActorLocation();
+	const FRotator SpawnRotation = FlatDirection.Rotation();
+	const FVector SpawnLocation = StartLoc + (FlatDirection * 50.0f);
 	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
 	ANYAttackPlayerBase* SpawnedAttack = GetWorld()->SpawnActorDeferred<ANYAttackPlayerBase>(

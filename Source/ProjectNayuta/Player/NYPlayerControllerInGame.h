@@ -24,4 +24,12 @@ public:
 	/** Local: push PlayerState HP into UpdatePlayerHpUI. Call after the HUD widget exists. */
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void RefreshPlayerHpUI();
+
+// Input
+protected:
+	/** Local: GameOnly + hidden cursor so IA_Look (Mouse XY) works without RMB. */
+	void ApplyGameplayLookInput();
+
+	/** Local: GameAndUI + visible cursor for reward / pause / game-over UI. */
+	void ApplyVisibleCursorGameInput();
 };

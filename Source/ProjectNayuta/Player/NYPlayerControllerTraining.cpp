@@ -73,16 +73,11 @@ void ANYPlayerControllerTraining::ApplyTrainingInputMode()
 
 	if (bIsTrainingPanelOpen)
 	{
-		FInputModeGameAndUI InputMode;
-		InputMode.SetHideCursorDuringCapture(false);
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		SetInputMode(InputMode);
-		bShowMouseCursor = true;
+		ApplyVisibleCursorGameInput();
 	}
 	else
 	{
-		SetInputMode(FInputModeGameOnly());
-		bShowMouseCursor = false;
+		ApplyGameplayLookInput();
 	}
 }
 

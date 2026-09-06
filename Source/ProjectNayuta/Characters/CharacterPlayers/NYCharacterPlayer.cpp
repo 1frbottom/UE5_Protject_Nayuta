@@ -6,7 +6,6 @@
 #include "ProjectNayuta.h"
 
 #include "Engine/OverlapResult.h"
-#include "Engine/LocalPlayer.h"
 
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
@@ -44,6 +43,10 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     SpringArmComp->SetupAttachment(RootComponent);
     SpringArmComp->TargetArmLength = 800.0f;
     SpringArmComp->bUsePawnControlRotation = true;
+    SpringArmComp->bInheritPitch = true;
+    SpringArmComp->bInheritYaw = true;
+    SpringArmComp->bInheritRoll = true;
+    SpringArmComp->SetRelativeRotation(FRotator::ZeroRotator);
 
     CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
     CameraComp->SetupAttachment(SpringArmComp, USpringArmComponent::SocketName);
@@ -53,9 +56,10 @@ ANYCharacterPlayer::ANYCharacterPlayer()
     GetCapsuleComponent()->SetCollisionProfileName(PROFILE_PLAYER);
 
     // Movement
-    // Face control yaw so AnimBP Direction can drive strafe/back blend-space clips.
+    // Face camera yaw so the spring arm sits on the character's back.
     bUseControllerRotationYaw = true;
     GetCharacterMovement()->bOrientRotationToMovement = false;
+    GetCharacterMovement()->bUseControllerDesiredRotation = false;
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
 
         // test
@@ -83,6 +87,7 @@ void ANYCharacterPlayer::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
 
     ResolveMonsterSoftCollision();
+    UpdateLocalAim(DeltaTime);
 }
 
 void ANYCharacterPlayer::BeginPlay()
@@ -94,15 +99,6 @@ void ANYCharacterPlayer::BeginPlay()
 		DefaultWeaponComp->OnWeaponSlotsChanged.AddDynamic(this, &ANYCharacterPlayer::UpdateWeaponVisual);
 		UpdateWeaponVisual();
 	}
-
-    // core logic : should be started by server(host)
-    if (HasAuthority())
-    {
-        
-
-
-    }
-
 }
 
 void ANYCharacterPlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -124,6 +120,8 @@ void ANYCharacterPlayer::PossessedBy(AController* NewController)
 
     PC_ref = Cast<ANYPlayerControllerBase>(GetController());
 
+    EnsureDefaultCameraPitch();
+
 }
 
 // after possessed, client only 
@@ -134,6 +132,8 @@ void ANYCharacterPlayer::PawnClientRestart()
     InitPlayerState();
 
     PC_ref = Cast<ANYPlayerControllerBase>(GetController());
+
+    EnsureDefaultCameraPitch();
 }
 
 void ANYCharacterPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -162,6 +162,37 @@ void ANYCharacterPlayer::InitPlayerState()
     }
 }
 
+ANYPlayerStateStage* ANYCharacterPlayer::ResolvePlayerState()
+{
+    if (!PS_ref)
+    {
+        InitPlayerState();
+    }
+
+    return PS_ref;
+}
+
+void ANYCharacterPlayer::EnsureDefaultCameraPitch()
+{
+    // Local: control rotation belongs to the owning client; the server copy would be overwritten anyway.
+    if (!IsLocallyControlled())
+    {
+        return;
+    }
+
+    AController* PossessingController = GetController();
+    if (!PossessingController)
+    {
+        return;
+    }
+
+    FRotator ControlRot = PossessingController->GetControlRotation();
+    if (FMath::Abs(ControlRot.Pitch) < 1.0f)
+    {
+        ControlRot.Pitch = DefaultCameraPitch;
+        PossessingController->SetControlRotation(ControlRot);
+    }
+}
 
 // Input
 void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -188,6 +219,11 @@ void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
         // Weapon swap
         EnhancedInputComponent->BindAction(WeaponSwapAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::SwapWeaponSlots);
+
+        // Attack. Canceled too, or an early release under a Hold-style trigger leaves the server firing.
+        EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &ANYCharacterPlayer::StartAttack);
+        EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Completed, this, &ANYCharacterPlayer::StopAttack);
+        EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Canceled, this, &ANYCharacterPlayer::StopAttack);
     }
 
 
@@ -195,27 +231,33 @@ void ANYCharacterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 void ANYCharacterPlayer::Look(const FInputActionValue& Value)
 {
-    FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-    if (PC_ref)
+    // Local: camera stays free while dead or in reward UI; only move/fire are phase-gated.
+    if (!PC_ref)
     {
-        float Sensitivity = PC_ref->GetMouseSensitivity();
-
-        AddControllerYawInput(LookAxisVector.X * Sensitivity);
-        AddControllerPitchInput(LookAxisVector.Y * Sensitivity);
+        PC_ref = Cast<ANYPlayerControllerBase>(GetController());
     }
+
+    if (!PC_ref)
+    {
+        return;
+    }
+
+    const FVector2D LookAxisVector = Value.Get<FVector2D>();
+    const float Sensitivity = PC_ref->GetMouseSensitivity();
+    AddControllerYawInput(LookAxisVector.X * Sensitivity);
+    AddControllerPitchInput(LookAxisVector.Y * Sensitivity);
 }
 
 void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 {
-    if (!PS_ref || !PS_ref->CanControlPawn())
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || !PS->CanControlPawn())
         return;
 
     FVector2D MovementVector = Value.Get<FVector2D>();
 
     if (Controller != nullptr)
     {
-        // Calculate front and right vectors based on the direction the controller (camera) looks at
         const FRotator Rotation = Controller->GetControlRotation();
         const FRotator YawRotation(0, Rotation.Yaw, 0);
 
@@ -230,12 +272,13 @@ void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Sprint()
 {
-    if (!PS_ref || !PS_ref->CanControlPawn())
+    ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || !PS->CanControlPawn())
         return;
 
     if (HasAuthority())
     {
-        PS_ref->SetSprinting(true);
+        PS->SetSprinting(true);
     }
     else
     {
@@ -266,7 +309,8 @@ void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
 
 void ANYCharacterPlayer::SwapWeaponSlots()
 {
-    if (!PS_ref || !PS_ref->CanControlPawn())
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || !PS->CanControlPawn())
     {
         return;
     }
@@ -305,6 +349,134 @@ void ANYCharacterPlayer::Server_SwapWeaponSlots_Implementation()
     }
 }
 
+void ANYCharacterPlayer::StartAttack()
+{
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || !PS->CanControlPawn() || !DefaultWeaponComp)
+    {
+        return;
+    }
+
+    ApplyAimDirection(GetLookAimDirection());
+
+    if (HasAuthority())
+    {
+        DefaultWeaponComp->SetWantsToFire(true);
+    }
+    else
+    {
+        Server_SetWantsToFire(true, CachedAimDirection);
+    }
+}
+
+void ANYCharacterPlayer::StopAttack()
+{
+    if (!DefaultWeaponComp)
+    {
+        return;
+    }
+
+    if (HasAuthority())
+    {
+        DefaultWeaponComp->SetWantsToFire(false);
+    }
+    else
+    {
+        Server_SetWantsToFire(false, CachedAimDirection);
+    }
+}
+
+void ANYCharacterPlayer::Server_SetWantsToFire_Implementation(bool bWantsToFire, FVector_NetQuantizeNormal AimDir)
+{
+    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
+    {
+        if (bWantsToFire && !PS->CanControlPawn())
+        {
+            return;
+        }
+    }
+
+    ApplyAimDirection(AimDir);
+
+    if (DefaultWeaponComp)
+    {
+        DefaultWeaponComp->SetWantsToFire(bWantsToFire);
+    }
+}
+
+void ANYCharacterPlayer::Server_SetAimDirection_Implementation(FVector_NetQuantizeNormal AimDir)
+{
+    ApplyAimDirection(AimDir);
+}
+
+void ANYCharacterPlayer::UpdateLocalAim(float DeltaTime)
+{
+    if (!IsLocallyControlled())
+    {
+        return;
+    }
+
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || !PS->CanControlPawn())
+    {
+        return;
+    }
+
+    ApplyAimDirection(GetLookAimDirection());
+
+    if (HasAuthority())
+    {
+        return;
+    }
+
+    AimRepTimer -= DeltaTime;
+    if (AimRepTimer > 0.0f)
+    {
+        return;
+    }
+
+    AimRepTimer = AimRepInterval;
+    Server_SetAimDirection(CachedAimDirection);
+}
+
+void ANYCharacterPlayer::ApplyAimDirection(const FVector& WorldDir)
+{
+    FVector FlatDir = WorldDir;
+    FlatDir.Z = 0.0f;
+    if (!FlatDir.Normalize())
+    {
+        return;
+    }
+
+    CachedAimDirection = FlatDir;
+
+    if (HasAuthority() && DefaultWeaponComp)
+    {
+        DefaultWeaponComp->SetAimDirection(FlatDir);
+    }
+}
+
+FVector ANYCharacterPlayer::GetLookAimDirection() const
+{
+    FVector Aim = FVector::ZeroVector;
+    if (Controller)
+    {
+        Aim = Controller->GetControlRotation().Vector();
+    }
+    else
+    {
+        Aim = GetActorForwardVector();
+    }
+
+    Aim.Z = 0.0f;
+    if (Aim.Normalize())
+    {
+        return Aim;
+    }
+
+    return GetActorForwardVector().GetSafeNormal2D();
+}
+
 
 // Stat
 float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -337,6 +509,11 @@ void ANYCharacterPlayer::Die()
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    if (HasAuthority() && DefaultWeaponComp)
+    {
+        DefaultWeaponComp->SetWantsToFire(false);
+    }
+
     // Attack montages occupy the slot until stopped; AnimGraph death waits otherwise.
     if (GetNetMode() != NM_DedicatedServer)
     {
@@ -368,12 +545,8 @@ void ANYCharacterPlayer::Revive()
 
 void ANYCharacterPlayer::ResolveMonsterSoftCollision()
 {
-    if (!PS_ref)
-    {
-        PS_ref = GetPlayerState<ANYPlayerStateStage>();
-    }
-
-    if (!PS_ref || !PS_ref->CanControlPawn())
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || !PS->CanControlPawn())
         return;
 
     const UCapsuleComponent* PlayerCapsule = GetCapsuleComponent();
