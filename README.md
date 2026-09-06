@@ -4,7 +4,7 @@
   <img src="https://github.com/user-attachments/assets/e763eb87-4000-430b-afca-d9a05946055c" width="600" />
 </p>
 
-* 유튜브 [링크](https://www.youtube.com/watch?v=KwKsSuFFGsM)
+* 유튜브 [링크](https://youtu.be/ZDTSspaKov8)
 
 <br><br>
 
