@@ -10,6 +10,7 @@
 class ANYMonsterBase;
 class UInputAction;
 class UInputMappingContext;
+class UNYWeaponDefinition;
 class UUserWidget;
 
 /**
@@ -47,6 +48,14 @@ protected:
 public:
 	UFUNCTION(BlueprintCallable, Category = "Training")
 	const TArray<TSubclassOf<ANYMonsterBase>>& GetSelectableMonsterClasses() const { return SelectableMonsterClasses; }
+
+	/** Definitions shown in the training widget. Fill on BP_PlayerController_Training. */
+	UFUNCTION(BlueprintCallable, Category = "Training")
+	TArray<UNYWeaponDefinition*> GetSelectableWeaponDefinitions() const;
+
+	/** Local: ask the server to equip WeaponDefinition into the primary or secondary slot. */
+	UFUNCTION(BlueprintCallable, Category = "Training")
+	void RequestSetTrainingWeapon(UNYWeaponDefinition* WeaponDefinition, bool bPrimary);
 
 	UFUNCTION(BlueprintCallable, Category = "Training")
 	void RequestSpawnTrainingMonster(TSubclassOf<ANYMonsterBase> MonsterClass);
@@ -86,6 +95,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Training")
 	TArray<TSubclassOf<ANYMonsterBase>> SelectableMonsterClasses;
 
+	/** Weapons the training widget can equip. Fill on BP_PlayerController_Training. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Training")
+	TArray<TObjectPtr<UNYWeaponDefinition>> SelectableWeaponDefinitions;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Training")
 	TSubclassOf<UUserWidget> TrainingWidgetClass;
 
@@ -94,6 +107,10 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Training")
 	bool bIsTrainingPanelOpen = true;
+
+	/** Client → Server. Rejects definitions that are not in SelectableWeaponDefinitions. */
+	UFUNCTION(Server, Reliable, Category = "Training")
+	void Server_SetTrainingWeapon(UNYWeaponDefinition* WeaponDefinition, bool bPrimary);
 
 	/** Client → Server */
 	UFUNCTION(Server, Reliable, Category = "Training")

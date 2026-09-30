@@ -48,15 +48,53 @@ void ANYGameModeTraining::SetupTrainingPlayer(APlayerController* NewPlayer)
 		PS->SetPlayerPhase(ENYPlayerPhase::Alive);
 	}
 
-	ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(NewPlayer->GetPawn());
-	if (!Character || !DefaultWeaponDefinition)
+	ANYCharacterPlayer* PlayerCharacter = Cast<ANYCharacterPlayer>(NewPlayer->GetPawn());
+	if (!PlayerCharacter)
 	{
 		return;
 	}
 
-	if (UNYWeaponComponent* WeaponComp = Character->GetWeaponComponent())
+	UNYWeaponComponent* WeaponComp = PlayerCharacter->GetWeaponComponent();
+	if (!WeaponComp)
 	{
-		WeaponComp->SetWeaponDefinition(DefaultWeaponDefinition);
+		return;
+	}
+
+	UNYWeaponDefinition* PrimaryWeapon = nullptr;
+	UNYWeaponDefinition* SecondaryWeapon = nullptr;
+
+	if (const ANYPlayerControllerTraining* TrainingPC = Cast<ANYPlayerControllerTraining>(NewPlayer))
+	{
+		const TArray<UNYWeaponDefinition*> Weapons = TrainingPC->GetSelectableWeaponDefinitions();
+		for (UNYWeaponDefinition* Weapon : Weapons)
+		{
+			if (!Weapon)
+			{
+				continue;
+			}
+
+			if (!PrimaryWeapon)
+			{
+				PrimaryWeapon = Weapon;
+				continue;
+			}
+
+			if (Weapon != PrimaryWeapon)
+			{
+				SecondaryWeapon = Weapon;
+				break;
+			}
+		}
+	}
+
+	if (PrimaryWeapon)
+	{
+		WeaponComp->SetWeaponDefinition(PrimaryWeapon);
+	}
+
+	if (SecondaryWeapon)
+	{
+		WeaponComp->SetSecondaryWeaponDefinition(SecondaryWeapon);
 	}
 }
 
@@ -130,6 +168,9 @@ void ANYGameModeTraining::ResetTrainingMonster(APlayerController* RequestingPC)
 		return;
 	}
 
+	// Death turns collision off and leaves bHasAppliedActivePose set, so a straight
+	// ActivateOnServer would skip turning collision back on. Pool reuse clears that flag.
+	ActiveTrainingMonster->DeactivateOnServer();
 	ApplyMonsterMaxHpOverride();
 	ApplyTrainingMode(RequestingPC);
 }
