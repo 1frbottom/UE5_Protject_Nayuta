@@ -85,6 +85,9 @@ protected:
 
 // Steam Specific (Invite & Presence)
 public:
+    // Local. Opens the Steam overlay invite dialog for the current session.
+    UFUNCTION(BlueprintCallable, Category = "Multiplay")
+    void ShowInviteUI();
 
 protected:
     // Steam Friend Invitation Accept Delegate
