@@ -3,7 +3,6 @@
 
 #include "Player/NYPlayerControllerBase.h"
 
-#include "Blueprint/UserWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 
@@ -55,12 +54,11 @@ void ANYPlayerControllerBase::SetMouseSensitivity(float NewValue)
 // Pause
 void ANYPlayerControllerBase::TogglePause()
 {
-    // [Common Logic] If the setting window is open, close it and initialize the reference
-    if (SettingWidgetRef && SettingWidgetRef->IsInViewport())
+    if (!IsLocalPlayerController())
     {
-        SettingWidgetRef->RemoveFromParent();
-        SettingWidgetRef = nullptr;
+        return;
     }
 
-
+    // Menu levels have no pause state, so the owning widget decides what "back" means.
+    OnPauseKeyPressed();
 }
