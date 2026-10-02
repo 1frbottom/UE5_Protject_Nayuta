@@ -19,7 +19,6 @@ void ANYPlayerControllerMainmenu::BeginPlay()
 
 }
 
-
 // Multiplay
 void ANYPlayerControllerMainmenu::Server_ToggleReady_Implementation()
 {
