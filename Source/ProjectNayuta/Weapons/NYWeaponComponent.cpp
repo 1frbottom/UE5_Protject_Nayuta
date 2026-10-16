@@ -437,7 +437,11 @@ void UNYWeaponComponent::SpawnAttackToward(const FVector& Direction)
 
 	if (SpawnedAttack)
 	{
-		SpawnedAttack->InitAttackStat(CurrentDamage, CurrentRange);
+		// Server: weapon damage scaled by the owner's level-up multiplier.
+		const ANYPlayerStateStage* OwnerPS = OwnerPawn->GetPlayerState<ANYPlayerStateStage>();
+		const float DamageMultiplier = OwnerPS ? OwnerPS->GetDamageMultiplier() : 1.0f;
+
+		SpawnedAttack->InitAttackStat(CurrentDamage * DamageMultiplier, CurrentRange);
 		SpawnedAttack->FinishSpawning(SpawnTransform);
 	}
 }

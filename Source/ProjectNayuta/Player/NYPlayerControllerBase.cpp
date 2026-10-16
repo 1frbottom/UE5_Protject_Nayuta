@@ -5,6 +5,8 @@
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameFramework/PlayerState.h"
+#include "Game/NYGameInstance.h"
 
 
 
@@ -25,6 +27,16 @@ void ANYPlayerControllerBase::BeginPlay()
         if (IMC_System)
         {
             Subsystem->AddMappingContext(IMC_System, 1);
+        }
+    }
+
+    // Local: PlayerState is recreated on non-seamless travel; seamless travel copies the name, so only resend when it differs.
+    if (IsLocalPlayerController())
+    {
+        const UNYGameInstance* GI = GetGameInstance<UNYGameInstance>();
+        if (GI && !GI->LocalPlayerName.IsEmpty() && (!PlayerState || PlayerState->GetPlayerName() != GI->LocalPlayerName))
+        {
+            SetName(GI->LocalPlayerName); // Client -> Server (ServerChangeName)
         }
     }
 }

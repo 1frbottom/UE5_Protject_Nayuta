@@ -24,6 +24,7 @@ void ANYPlayerStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ANYPlayerStateStage, MaxExp);
     DOREPLIFETIME(ANYPlayerStateStage, CurrPlayerLv);
     DOREPLIFETIME(ANYPlayerStateStage, CurrGold);
+    DOREPLIFETIME(ANYPlayerStateStage, DamageMultiplier);
 
     DOREPLIFETIME(ANYPlayerStateStage, CurrHp);
     DOREPLIFETIME(ANYPlayerStateStage, MaxHP);
@@ -131,10 +132,19 @@ void ANYPlayerStateStage::AddExp(int32 InExp)
             break;
         }
 
+        // Bonus comes from the row of the level being left, so read it before CurrPlayerLv changes.
+        FNYPlayerLevelRow LevelRow;
+        const bool bHasLevelRow = GM && GM->TryGetPlayerLevelRow(CurrPlayerLv, LevelRow);
+
         CurrExp -= MaxExp;
         CurrPlayerLv = NextLevel;
         MaxExp = NextMaxExp;
         bLeveledUp = true;
+
+        if (bHasLevelRow)
+        {
+            ApplyLevelUpBonus(LevelRow);
+        }
     }
 
     OnRep_CurrExp();
@@ -166,6 +176,7 @@ void ANYPlayerStateStage::ResetRunStats()
     CurrPlayerLv = 1;
     CurrExp = 0;
     CurrGold = 0;
+    DamageMultiplier = 1.0f;
     RefreshMaxExpForCurrentLevel();
 
     LastNotifiedPlayerLevel = CurrPlayerLv;
@@ -227,6 +238,44 @@ void ANYPlayerStateStage::NotifyLocalLevelUpIfNeeded()
         }
 
         LastNotifiedPlayerLevel = CurrPlayerLv;
+    }
+}
+
+void ANYPlayerStateStage::ApplyLevelUpBonus(const FNYPlayerLevelRow& Row)
+{
+    // Server
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    DamageMultiplier += Row.DamageMultiplierBonus;
+
+    if (Row.MoveSpeedBonus > 0.0f)
+    {
+        AddMoveSpeed(Row.MoveSpeedBonus);
+    }
+
+    // Raise MaxHP without AddMaxHp(), which refills to full. Level-up only heals HealRatio of the new MaxHP.
+    MaxHP += Row.MaxHpBonus;
+
+    float HealAmount = 0.0f;
+    if (CurrPhase == ENYPlayerPhase::Alive && CurrHp > 0.0f)
+    {
+        HealAmount = Row.MaxHpBonus + (MaxHP * Row.HealRatio);
+        CurrHp = FMath::Clamp(CurrHp + HealAmount, 0.0f, MaxHP);
+    }
+
+    OnRep_CurrHp();
+
+    if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn()))
+    {
+        Character->NotifyLevelUp(
+            CurrPlayerLv,
+            Row.MaxHpBonus,
+            Row.DamageMultiplierBonus,
+            Row.MoveSpeedBonus,
+            HealAmount);
     }
 }
 

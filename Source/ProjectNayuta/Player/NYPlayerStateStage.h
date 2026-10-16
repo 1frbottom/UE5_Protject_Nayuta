@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Player/NYPlayerStateBase.h"
 #include "Data/NYRewardTypes.h"
+#include "Data/NYStageDataRows.h"
 #include "NYPlayerStateStage.generated.h"
 
 
@@ -55,6 +56,7 @@ public:
 	FORCEINLINE int32 GetCurrExp() const { return CurrExp; }
 	FORCEINLINE int32 GetMaxExp() const { return MaxExp; }
 	FORCEINLINE int32 GetCurrGold() const { return CurrGold; }
+	FORCEINLINE float GetDamageMultiplier() const { return DamageMultiplier; }
 
 	void AddExp(int32 InExp);
 	void AddGold(int32 InGold);
@@ -67,6 +69,13 @@ protected:
 	void NotifyLocalExpUI();
 	void NotifyLocalGoldUI();
 	void NotifyLocalLevelUpIfNeeded();
+
+	/** Server: grant one level-up step (MaxHP, damage, speed, then heal) from the row of the level just left. */
+	void ApplyLevelUpBonus(const FNYPlayerLevelRow& Row);
+
+	/** Permanent damage multiplier from level-ups. Applied by the weapon component on the server. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Stat")
+	float DamageMultiplier = 1.0f;
 
 	/** Local-only: suppresses false OnPlayerLevelUp on first replicate / after ResetRunStats. */
 	int32 LastNotifiedPlayerLevel = 0;
@@ -111,11 +120,11 @@ public:
 
 protected:
 	UPROPERTY(Replicated, EditAnywhere, Category = "Stat")
-	//float MaxHP = 100.0f;
-	float MaxHP = 300.0f;
+	//float MaxHP = 1000.0f;
+	float MaxHP = 1000.0f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrHp, EditAnywhere, Category = "Stat")
-	//float CurrHp = 100.0f;
+	//float CurrHp = 1000.0f;
 	float CurrHp = 1000.0f;
 
 	UFUNCTION()
