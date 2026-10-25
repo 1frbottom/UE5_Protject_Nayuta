@@ -1,10 +1,10 @@
 # [UE5 4인 협동 로그라이크]
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/99d215b6-7362-4105-8ebf-e146f5d2086a" width="600" />
+  <img src="https://github.com/user-attachments/assets/07ae800f-dfed-4b8f-b5fb-366bfa07fd53" width="600" />
 </p>
 
-* 유튜브 [링크](https://youtu.be/ZDTSspaKov8)
+* 유튜브 [링크](https://youtu.be/VkQyTnjKNqA)
 
 <br><br>
 
