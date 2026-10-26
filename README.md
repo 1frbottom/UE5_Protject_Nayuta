@@ -4,7 +4,7 @@
   <img src="https://github.com/user-attachments/assets/07ae800f-dfed-4b8f-b5fb-366bfa07fd53" width="600" />
 </p>
 
-* 유튜브 [링크](https://youtu.be/VkQyTnjKNqA)
+* [Youtube Preview](https://youtu.be/VkQyTnjKNqA)
 
 <br><br>
 
@@ -16,9 +16,41 @@
 
 <br><br>
 
-## 현재 상태
+## 핵심 구현
 
-**진행 중**
+### 몬스터 Pooling 및 네트워크 최적화
+
+다수의 몬스터를 반복해서 생성·제거하지 않도록 Object Pool로 재사용합니다.  
+비활성 몬스터에는 Net Dormancy를 적용하고, 활성화 시 위치·타깃·이동 seed를 복제합니다. 몬스터 이동은 각 machine에서 계산하되, 복제된 seed로 이동 속도와 접근 각도를 동일하게 구성합니다.
+
+* [몬스터 구조 및 복제 데이터](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.h)
+* [활성화·비활성화 처리](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L319-L449)
+* [Object Pool 구현](Source/ProjectNayuta/Monsters/NYMonsterPoolComponent.cpp#L12-L73)
+* [웨이브 기반 몬스터 배치](Source/ProjectNayuta/Monsters/NYMonsterSpawnComponent.cpp#L116-L186)
+
+### Server-authoritative 전투
+
+클라이언트는 공격 입력과 조준 방향만 RPC로 전달합니다.  
+서버가 공격 가능 상태와 cooldown을 검증하고 damage를 계산한 뒤 공격 Actor를 생성합니다. Animation Montage의 `AttackCommit` 시점을 읽어 애니메이션과 실제 공격 발생 시점도 일치시켰습니다.
+
+* [무기 시스템 구조](Source/ProjectNayuta/Weapons/NYWeaponComponent.h)
+* [공격 cooldown 처리](Source/ProjectNayuta/Weapons/NYWeaponComponent.cpp#L278-L303)
+* [서버 공격 판정 및 생성](Source/ProjectNayuta/Weapons/NYWeaponComponent.cpp#L341-L447)
+* [클라이언트 입력 및 RPC](Source/ProjectNayuta/Characters/CharacterPlayers/NYCharacterPlayer.cpp#L350-L477)
+
+### 멀티플레이 웨이브 및 보상 흐름
+
+게임 진행은 서버에만 존재하는 `GameMode`가 담당하고, 클라이언트에 필요한 페이즈와 킬 수는 `GameState`로 복제합니다.  
+각 플레이어의 보상 후보는 `PlayerState`에 OwnerOnly로 복제하며, 선택 결과는 서버에서 다시 검증합니다. 모든 플레이어가 선택을 마치거나 중간에 이탈한 경우 현재 인원을 다시 계산하여 다음 웨이브로 진행합니다.
+
+* [웨이브 진행 구조](Source/ProjectNayuta/Game/NYGameModeStage.h)
+* [웨이브 종료 및 보상 페이즈 전환](Source/ProjectNayuta/Game/NYGameModeStage.cpp#L321-L505)
+* [공용 매치 상태 복제](Source/ProjectNayuta/Game/NYGameStateStage.h)
+* [OwnerOnly 보상 복제 및 서버 검증](Source/ProjectNayuta/Player/NYPlayerStateStage.cpp#L420-L516)
+
+<br><br>
+
+## 현재 상태
 
 | 맵 | 역할 |
 | :--- | :--- |
@@ -31,23 +63,10 @@
 
 **구현 예정**
 
-* **UI / UX :** 메인메뉴 및 기타 UI 외관
+* **UI / UX :** 
 * **전투 시스템 :**
 * **웨이브 :**
-* **사운드 :** 기타 사운드
-
-<br><br>
-
-## 주요 클래스
-
-| 클래스 | 역할 |
-| :--- | :--- |
-| [NYGameModeStage](Source/ProjectNayuta/Game/NYGameModeStage.h) | 스테이지 권한, 스폰, 몬스터 라이프사이클 |
-| [NYGameStateStage](Source/ProjectNayuta/Game/NYGameStateStage.h) | 복제되는 매치 상태 (페이즈, 킬 수) |
-| [NYPlayerControllerStage](Source/ProjectNayuta/Player/NYPlayerControllerStage.h) | 로컬 입력 / UI 진입 |
-| [NYMonsterPoolComponent](Source/ProjectNayuta/Monsters/NYMonsterPoolComponent.h) | 서버 전용 몬스터 오브젝트 풀 |
-| [NYWeaponComponent](Source/ProjectNayuta/Weapons/NYWeaponComponent.h) | 무기 슬롯·레벨 복제 |
-| [NYStageContentRegistry](Source/ProjectNayuta/Data/NYStageContentRegistry.h) | 데이터 테이블 → 몬스터 정의 해석 |
+* **사운드 :** 
 
 <br><br>
 
