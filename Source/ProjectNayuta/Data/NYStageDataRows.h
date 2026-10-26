@@ -14,7 +14,10 @@
 class UNYWeaponDefinition;
 
 // Level
-/** Row name = player level (e.g. "1", "2"). RequiredExp = EXP to reach the next level. */
+/**
+ * Row name = player level (e.g. "1", "2"). Describes the step from that level to the next one:
+ * RequiredExp is the cost, and the bonus columns are granted once when that step is completed.
+ */
 USTRUCT(BlueprintType)
 struct FNYPlayerLevelRow : public FTableRowBase
 {
@@ -22,6 +25,22 @@ struct FNYPlayerLevelRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level")
 	int32 RequiredExp = 100;
+
+	/** Added to MaxHP on level-up. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level", meta = (ClampMin = "0"))
+	float MaxHpBonus = 10.0f;
+
+	/** Added to the permanent damage multiplier (0.05 = +5%). Stacks additively. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level", meta = (ClampMin = "0"))
+	float DamageMultiplierBonus = 0.05f;
+
+	/** Added to MoveSpeed on level-up. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level", meta = (ClampMin = "0"))
+	float MoveSpeedBonus = 5.0f;
+
+	/** Fraction of the new MaxHP healed on level-up (0.1 = 10%). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level", meta = (ClampMin = "0", ClampMax = "1"))
+	float HealRatio = 0.1f;
 };
 
 // Wave

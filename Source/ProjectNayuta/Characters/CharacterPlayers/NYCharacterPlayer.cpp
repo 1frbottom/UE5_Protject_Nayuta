@@ -652,6 +652,28 @@ void ANYCharacterPlayer::Multicast_OnHitFeedback_Implementation(float DamageTake
     OnHitFeedback(DamageTaken);
 }
 
+void ANYCharacterPlayer::NotifyLevelUp(int32 NewLevel, float MaxHpBonus, float DamageMultiplierBonus, float MoveSpeedBonus, float HealAmount)
+{
+    // Server
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    Multicast_OnLevelUp(NewLevel, MaxHpBonus, DamageMultiplierBonus, MoveSpeedBonus, HealAmount);
+}
+
+void ANYCharacterPlayer::Multicast_OnLevelUp_Implementation(int32 NewLevel, float MaxHpBonus, float DamageMultiplierBonus, float MoveSpeedBonus, float HealAmount)
+{
+    // NetMulticast
+    if (GetNetMode() == NM_DedicatedServer)
+    {
+        return;
+    }
+
+    OnLevelUpFeedback(NewLevel, MaxHpBonus, DamageMultiplierBonus, MoveSpeedBonus, HealAmount);
+}
+
 void ANYCharacterPlayer::ResetWeaponForNewRun()
 {
     if (DefaultWeaponComp)

@@ -197,6 +197,23 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Death")
 	void OnDeathFeedback();
 
+// LevelUp
+public:
+	/** Server: play level-up FX and text on every machine that renders this pawn. */
+	void NotifyLevelUp(int32 NewLevel, float MaxHpBonus, float DamageMultiplierBonus, float MoveSpeedBonus, float HealAmount);
+
+protected:
+	/**
+	 * Presentation only (Niagara, world text), authored in Character Blueprint.
+	 * Fires on every machine that renders this pawn, never on a dedicated server.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "LevelUp")
+	void OnLevelUpFeedback(int32 NewLevel, float MaxHpBonus, float DamageMultiplierBonus, float MoveSpeedBonus, float HealAmount);
+
+	/** Server: notify all machines this pawn leveled up. */
+	UFUNCTION(NetMulticast, Reliable, Category = "LevelUp")
+	void Multicast_OnLevelUp(int32 NewLevel, float MaxHpBonus, float DamageMultiplierBonus, float MoveSpeedBonus, float HealAmount);
+
 // Weapon
 public:
 	FORCEINLINE UNYWeaponComponent* GetWeaponComponent() const { return DefaultWeaponComp; }

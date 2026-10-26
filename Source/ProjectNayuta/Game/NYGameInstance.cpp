@@ -5,6 +5,7 @@
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
 #include "Online/OnlineSessionNames.h"
+#include "Interfaces/OnlineExternalUIInterface.h"
 
 
 
@@ -145,6 +146,24 @@ void UNYGameInstance::HostGame(FName SessionName, int32 MaxPlayers)
 
     SessionInterface->CreateSession(0, NAME_GameSession, SessionSettings);
 
+}
+
+void UNYGameInstance::ShowInviteUI()
+{
+    if (!SessionInterface.IsValid() || SessionInterface->GetNamedSession(NAME_GameSession) == nullptr)
+    {
+        if (GEngine)
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Invite UI requires an active session."));
+        return;
+    }
+
+    IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+    IOnlineExternalUIPtr ExternalUI = Subsystem ? Subsystem->GetExternalUIInterface() : nullptr;
+    if (!ExternalUI.IsValid() || !ExternalUI->ShowInviteUI(0, NAME_GameSession))
+    {
+        if (GEngine)
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to open Steam invite UI."));
+    }
 }
 
 // [Steam Specific] Invitation Accept Callback

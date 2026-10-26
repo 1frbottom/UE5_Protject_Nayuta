@@ -6,8 +6,6 @@
 #include "GameFramework/PlayerController.h"
 #include "NYPlayerControllerBase.generated.h"
 
-class UUserWidget;
-
 UCLASS()
 class PROJECTNAYUTA_API ANYPlayerControllerBase : public APlayerController
 {
@@ -38,13 +36,15 @@ protected:
 
 // Pause
 public:
+    /** Local: pause-key entry point. Base only backs out of menu widgets; subclasses override for real pausing. */
     UFUNCTION(BlueprintCallable, Category = "UI")
     virtual void TogglePause();
 
-    UPROPERTY(BlueprintReadWrite, Category = "UI")
-    TObjectPtr<UUserWidget> SettingWidgetRef;
-
 protected:
+    /** Local: menu widget steps back one level (submenu -> root, root -> nothing). */
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void OnPauseKeyPressed();
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     TObjectPtr<class UInputAction> PauseAction;
 

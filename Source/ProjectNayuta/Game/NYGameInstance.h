@@ -22,7 +22,9 @@ public:
 
 // Common
 public:
-
+    /** Local: player name loaded from BP_SaveGame (set by BP). Sent to the server once PlayerController starts. */
+    UPROPERTY(BlueprintReadWrite, Category = "Multiplay")
+    FString LocalPlayerName;
 
 protected:
     void OnNetworkFailure(UWorld* World, class UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
@@ -85,6 +87,9 @@ protected:
 
 // Steam Specific (Invite & Presence)
 public:
+    // Local. Opens the Steam overlay invite dialog for the current session.
+    UFUNCTION(BlueprintCallable, Category = "Multiplay")
+    void ShowInviteUI();
 
 protected:
     // Steam Friend Invitation Accept Delegate

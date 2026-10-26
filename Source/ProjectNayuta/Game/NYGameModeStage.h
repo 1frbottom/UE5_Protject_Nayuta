@@ -69,6 +69,9 @@ public:
 	/** EXP required to advance from InLevel. Returns 0 when the row is missing (max level). */
 	int32 GetRequiredExpForLevel(int32 InLevel) const;
 
+	/** Lookup the PlayerLevelDataTable row for InLevel. Returns false when the row is missing. */
+	bool TryGetPlayerLevelRow(int32 InLevel, FNYPlayerLevelRow& OutRow) const;
+
 	/** Lookup monster kill rewards by RewardRowID. Returns false when the row is missing. */
 	bool TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const;
 

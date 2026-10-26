@@ -3,9 +3,10 @@
 
 #include "Player/NYPlayerControllerBase.h"
 
-#include "Blueprint/UserWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameFramework/PlayerState.h"
+#include "Game/NYGameInstance.h"
 
 
 
@@ -26,6 +27,16 @@ void ANYPlayerControllerBase::BeginPlay()
         if (IMC_System)
         {
             Subsystem->AddMappingContext(IMC_System, 1);
+        }
+    }
+
+    // Local: PlayerState is recreated on non-seamless travel; seamless travel copies the name, so only resend when it differs.
+    if (IsLocalPlayerController())
+    {
+        const UNYGameInstance* GI = GetGameInstance<UNYGameInstance>();
+        if (GI && !GI->LocalPlayerName.IsEmpty() && (!PlayerState || PlayerState->GetPlayerName() != GI->LocalPlayerName))
+        {
+            SetName(GI->LocalPlayerName); // Client -> Server (ServerChangeName)
         }
     }
 }
@@ -55,12 +66,11 @@ void ANYPlayerControllerBase::SetMouseSensitivity(float NewValue)
 // Pause
 void ANYPlayerControllerBase::TogglePause()
 {
-    // [Common Logic] If the setting window is open, close it and initialize the reference
-    if (SettingWidgetRef && SettingWidgetRef->IsInViewport())
+    if (!IsLocalPlayerController())
     {
-        SettingWidgetRef->RemoveFromParent();
-        SettingWidgetRef = nullptr;
+        return;
     }
 
-
+    // Menu levels have no pause state, so the owning widget decides what "back" means.
+    OnPauseKeyPressed();
 }

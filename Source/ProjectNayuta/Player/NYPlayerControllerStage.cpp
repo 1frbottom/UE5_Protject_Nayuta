@@ -6,8 +6,6 @@
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/PawnMovementComponent.h"
 
-#include "Blueprint/UserWidget.h"
-
 #include "Game/NYGameModeStage.h"
 #include "Game/NYGameStateStage.h"
 
@@ -36,7 +34,7 @@ void ANYPlayerControllerStage::OnPossess(APawn* InPawn)
 
     ENYInputConfig Config = ENYInputConfig::Gameplay;
 
-    if (bIsPaused)
+    if (IsPauseMenuOpen())
     {
         Config = ENYInputConfig::ModalUI;
     }
@@ -83,7 +81,6 @@ void ANYPlayerControllerStage::ApplyInputConfig(ENYInputConfig Config)
         }
 
         ApplyGameplayLookInput();
-        bIsPaused = false;
         break;
 
     case ENYInputConfig::ModalUI:
@@ -119,6 +116,9 @@ void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
     {
         return;
     }
+
+    // Phase UI takes over the screen; drop the pause menu so it cannot linger underneath.
+    ResetPauseMenu();
 
     switch (NewPhase)
     {
@@ -158,26 +158,57 @@ void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
 
 void ANYPlayerControllerStage::TogglePause()
 {
-    const bool bWasSettingOpen = (SettingWidgetRef != nullptr && SettingWidgetRef->IsInViewport());
-
-    Super::TogglePause();
-
-    if (bWasSettingOpen)
+    if (!IsLocalPlayerController())
     {
         return;
     }
 
-    if (bIsPaused)
+    // Reward / game-over / clear UI owns the screen, so the pause menu must not stack on top of it.
+    if (ANYGameStateStage* GS = GetWorld()->GetGameState<ANYGameStateStage>())
     {
-        OnTogglePauseMenu();
-        ApplyInputConfig(ENYInputConfig::Gameplay);
+        if (GS->GetGamePhase() != ENYGamePhase::Playing)
+        {
+            return;
+        }
     }
-    else
+
+    if (PauseMenuState == ENYPauseMenuState::Closed)
     {
-        OnTogglePauseMenu();
-        ApplyInputConfig(ENYInputConfig::ModalUI);
-        bIsPaused = true;
+        SetPauseMenuState(ENYPauseMenuState::Root);
+        return;
     }
+
+    // Same call the settings button uses. Set Submenu reverses when the value matches CurrentSubMenu.
+    if (TryRevertPauseSubmenu())
+    {
+        return;
+    }
+
+    SetPauseMenuState(ENYPauseMenuState::Closed);
+}
+
+void ANYPlayerControllerStage::SetPauseMenuState(ENYPauseMenuState NewState)
+{
+    if (!IsLocalPlayerController() || PauseMenuState == NewState)
+    {
+        return;
+    }
+
+    PauseMenuState = NewState;
+    OnPauseMenuStateChanged(NewState);
+
+    ApplyInputConfig(NewState == ENYPauseMenuState::Closed ? ENYInputConfig::Gameplay : ENYInputConfig::ModalUI);
+}
+
+void ANYPlayerControllerStage::ResetPauseMenu()
+{
+    if (PauseMenuState == ENYPauseMenuState::Closed)
+    {
+        return;
+    }
+
+    PauseMenuState = ENYPauseMenuState::Closed;
+    OnPauseMenuStateChanged(ENYPauseMenuState::Closed);
 }
 
 void ANYPlayerControllerStage::ConfirmRewardSelection(int32 SlotIndex)

@@ -16,4 +16,11 @@ class PROJECTNAYUTA_API ANYGameModeBase : public AGameModeBase
 
 public:
 	ANYGameModeBase();
+
+	/** Server: clamp client-supplied player names so name tags cannot overflow. */
+	virtual void ChangeName(AController* Controller, const FString& NewName, bool bNameChange) override;
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Multiplay")
+	int32 MaxPlayerNameLength = 12;
 };

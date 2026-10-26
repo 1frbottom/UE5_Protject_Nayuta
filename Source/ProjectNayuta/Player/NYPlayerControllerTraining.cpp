@@ -7,8 +7,11 @@
 #include "Blueprint/UserWidget.h"
 
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Characters/CharacterPlayers/NYCharacterPlayer.h"
 #include "Game/NYGameModeTraining.h"
 #include "Player/NYPlayerStateStage.h"
+#include "Weapons/NYWeaponComponent.h"
+#include "Weapons/NYWeaponDefinition.h"
 
 ANYPlayerControllerTraining::ANYPlayerControllerTraining()
 {
@@ -119,6 +122,22 @@ void ANYPlayerControllerTraining::SetTrainingPanelVisible(bool bVisible)
 		bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }
 
+TArray<UNYWeaponDefinition*> ANYPlayerControllerTraining::GetSelectableWeaponDefinitions() const
+{
+	TArray<UNYWeaponDefinition*> Definitions;
+	Definitions.Reserve(SelectableWeaponDefinitions.Num());
+	for (const TObjectPtr<UNYWeaponDefinition>& Definition : SelectableWeaponDefinitions)
+	{
+		Definitions.Add(Definition.Get());
+	}
+	return Definitions;
+}
+
+void ANYPlayerControllerTraining::RequestSetTrainingWeapon(UNYWeaponDefinition* WeaponDefinition, bool bPrimary)
+{
+	Server_SetTrainingWeapon(WeaponDefinition, bPrimary);
+}
+
 void ANYPlayerControllerTraining::RequestSpawnTrainingMonster(TSubclassOf<ANYMonsterBase> MonsterClass)
 {
 	Server_SpawnTrainingMonster(MonsterClass);
@@ -211,6 +230,30 @@ float ANYPlayerControllerTraining::GetMonsterClassDefaultMaxHp(TSubclassOf<ANYMo
 }
 
 // Server
+void ANYPlayerControllerTraining::Server_SetTrainingWeapon_Implementation(UNYWeaponDefinition* WeaponDefinition, bool bPrimary)
+{
+	if (!WeaponDefinition || !SelectableWeaponDefinitions.Contains(WeaponDefinition))
+	{
+		return;
+	}
+
+	ANYCharacterPlayer* PlayerCharacter = Cast<ANYCharacterPlayer>(GetPawn());
+	UNYWeaponComponent* WeaponComp = PlayerCharacter ? PlayerCharacter->GetWeaponComponent() : nullptr;
+	if (!WeaponComp)
+	{
+		return;
+	}
+
+	if (bPrimary)
+	{
+		WeaponComp->SetWeaponDefinition(WeaponDefinition);
+	}
+	else
+	{
+		WeaponComp->SetSecondaryWeaponDefinition(WeaponDefinition);
+	}
+}
+
 void ANYPlayerControllerTraining::Server_SpawnTrainingMonster_Implementation(TSubclassOf<ANYMonsterBase> MonsterClass)
 {
 	if (ANYGameModeTraining* GM = GetWorld()->GetAuthGameMode<ANYGameModeTraining>())

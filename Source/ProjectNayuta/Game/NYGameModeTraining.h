@@ -10,7 +10,6 @@
 
 
 class ANYMonsterBase;
-class UNYWeaponDefinition;
 
 UENUM(BlueprintType)
 enum class ENYTrainingMonsterMode : uint8
@@ -55,15 +54,11 @@ public:
 	float GetTrainingMonsterCurrHp() const;
 
 protected:
-	/** Granted to each player pawn on spawn when set. */
-	UPROPERTY(EditDefaultsOnly, Category = "Training")
-	TObjectPtr<UNYWeaponDefinition> DefaultWeaponDefinition;
-
 	/** Where the training monster appears (set on BP_GameMode_Training or level override). */
 	UPROPERTY(EditAnywhere, Category = "Training")
 	FTransform TrainingSpawnTransform;
 
-	/** Server: Playing phase + Alive + optional default weapon. */
+	/** Server: Playing phase + Alive, then equip the training PC weapon list. */
 	void SetupTrainingPlayer(APlayerController* NewPlayer);
 
 	/** Server: apply CurrentTrainingMode to ActiveTrainingMonster. */

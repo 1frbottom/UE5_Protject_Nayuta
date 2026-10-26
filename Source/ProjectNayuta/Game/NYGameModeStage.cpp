@@ -121,6 +121,24 @@ int32 ANYGameModeStage::GetRequiredExpForLevel(int32 InLevel) const
 	return Row->RequiredExp;
 }
 
+bool ANYGameModeStage::TryGetPlayerLevelRow(int32 InLevel, FNYPlayerLevelRow& OutRow) const
+{
+	if (!PlayerLevelDataTable || InLevel <= 0)
+	{
+		return false;
+	}
+
+	const FName RowName = FName(*FString::FromInt(InLevel));
+	const FNYPlayerLevelRow* Row = PlayerLevelDataTable->FindRow<FNYPlayerLevelRow>(RowName, TEXT("PlayerLevel"));
+	if (!Row)
+	{
+		return false;
+	}
+
+	OutRow = *Row;
+	return true;
+}
+
 bool ANYGameModeStage::TryGetMonsterRewards(FName RewardRowID, int32& OutExp, int32& OutGold) const
 {
 	OutExp = 0;
