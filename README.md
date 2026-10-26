@@ -1,12 +1,13 @@
-# ProjectNayuta
+# Project Nayuta
 
-> Unreal Engine 5 Listen Server 기반 4인 협동 3D 로그라이크
+> UE5 4인 로그라이크(리슨서버)
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/07ae800f-dfed-4b8f-b5fb-366bfa07fd53" width="600" />
 </p>
 
-[Youtube Preview](https://youtu.be/VkQyTnjKNqA) · [실행 파일 (Google Drive)](https://drive.google.com/drive/folders/1pTrk9NoL3PSQWJ5tqH26mLx6ymtuvojM?usp=drive_link)
+* 유튜브 ([Preview](https://youtu.be/VkQyTnjKNqA))
+* 실행파일 ([Google Drive](https://drive.google.com/drive/folders/1pTrk9NoL3PSQWJ5tqH26mLx6ymtuvojM?usp=drive_link))
 
 <br>
 
@@ -14,35 +15,24 @@
 
 * **개발 기간 :** 2026.05 ~ 진행중
 * **개발 인원 :** 1명
-* **엔진 및 언어 :** Unreal Engine 5.4 / C++
+* **엔진 및 언어 :** Unreal Engine 5.4 / C++ / Steam OSS
 * **플랫폼 :** PC (Windows)
 
 <br>
 
 ## 핵심 구현
 
-### 1. 대규모 몬스터 처리 구조
+### 1. 대규모 몬스터 처리
 
-* [활성화·비활성화와 시드 복제](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L319-L452)
-* [CMC 대신 만든 바닥·스텝업 이동](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterMovementComponent.cpp#L43-L169)
-* [Object Pool 생성·회수](Source/ProjectNayuta/Monsters/NYMonsterPoolComponent.cpp#L14-L91)
+* [활성화, 시드복제](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L319-L452)
+* [전용 이동컴포넌트](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterMovementComponent.cpp#L43-L169)
+* [오브젝트 풀](Source/ProjectNayuta/Monsters/NYMonsterPoolComponent.cpp#L14-L91)
 
-### 2. 서버 권위 전투
+### 2. 서버 권위 멀티플레이
 
-* [클라이언트 입력 → 서버 RPC](Source/ProjectNayuta/Characters/CharacterPlayers/NYCharacterPlayer.cpp#L352-L440)
-* [쿨다운 검증](Source/ProjectNayuta/Weapons/NYWeaponComponent.cpp#L276-L303)
-* [몽타주 시점에 맞춘 공격 생성](Source/ProjectNayuta/Weapons/NYWeaponComponent.cpp#L341-L447)
-
-### 3. 서버 권위 웨이브 / 보상
-
-* [GameState 페이즈 복제와 UI 전달](Source/ProjectNayuta/Game/NYGameStateStage.cpp#L26-L59)
-* [보상 페이즈 시작·다음 웨이브 전환](Source/ProjectNayuta/Game/NYGameModeStage.cpp#L434-L506)
-* [OwnerOnly 복제 설정](Source/ProjectNayuta/Player/NYPlayerStateStage.cpp#L17-L38)
-* [보상 선택 서버 검증](Source/ProjectNayuta/Player/NYPlayerStateStage.cpp#L420-L518)
-
-### 4. Steam 세션
-
-* [네트워크 실패 시 세션 정리와 메인메뉴 복귀](Source/ProjectNayuta/Game/NYGameInstance.cpp#L44-L75)
+* [서버 공격 생성](Source/ProjectNayuta/Weapons/NYWeaponComponent.cpp#L341-L447)
+* [GameState 페이즈 복제](Source/ProjectNayuta/Game/NYGameStateStage.cpp#L26-L59)
+* [보상선택 서버 검증](Source/ProjectNayuta/Player/NYPlayerStateStage.cpp#L420-L518)
 
 <br>
 
