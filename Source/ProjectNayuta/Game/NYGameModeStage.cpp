@@ -815,8 +815,15 @@ TArray<FNYRewardOffer> ANYGameModeStage::GenerateRewardOffers(ANYPlayerStateStag
 
 
 // Retry
-void ANYGameModeStage::AddRetryVote()
+void ANYGameModeStage::AddRetryVote(const ANYPlayerStateStage* Voter)
 {
+	// Server
+	if (!Voter || RetryVoters.Contains(Voter))
+	{
+		return;
+	}
+
+	RetryVoters.Add(Voter);
 	RetryVoteCount++;
 
 	// TODO: Replicate retry vote count to GameState for UI.

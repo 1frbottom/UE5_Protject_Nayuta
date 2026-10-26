@@ -237,15 +237,16 @@ void ANYPlayerControllerStage::Server_SelectReward_Implementation(int32 UpgradeI
 
 void ANYPlayerControllerStage::Server_RequestRetry_Implementation()
 {
+    // Server
     ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
-    if (PS->GetPlayerPhase() != ENYPlayerPhase::Dead)
+    if (!PS || PS->GetPlayerPhase() != ENYPlayerPhase::Dead)
     {
         return;
     }
 
     if (ANYGameModeStage* GM = GetWorld()->GetAuthGameMode<ANYGameModeStage>())
     {
-        GM->AddRetryVote();
+        GM->AddRetryVote(PS);
     }
 }
 

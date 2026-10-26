@@ -127,10 +127,14 @@ protected:
 
 // Retry
 public:
-	void AddRetryVote();
+	/** Server: register Voter's retry vote. Repeated votes from the same player are ignored. */
+	void AddRetryVote(const ANYPlayerStateStage* Voter);
 
 protected:
 	int32 RetryVoteCount = 0;
+
+	/** Server: players who already voted, so one player cannot trigger the restart alone. */
+	TSet<TWeakObjectPtr<const ANYPlayerStateStage>> RetryVoters;
 
 
 // GameClear
