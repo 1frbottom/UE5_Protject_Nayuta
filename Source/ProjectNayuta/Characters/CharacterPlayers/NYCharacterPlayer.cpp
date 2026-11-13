@@ -21,6 +21,7 @@
 
 #include "Game/NYGameModeStage.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Characters/CharacterPlayers/NYCharacterMovementComponent.h"
 
 #include "Player/NYPlayerControllerBase.h"
 #include "Player/NYPlayerStateStage.h"
@@ -34,7 +35,8 @@
 
 
 
-ANYCharacterPlayer::ANYCharacterPlayer()
+ANYCharacterPlayer::ANYCharacterPlayer(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UNYCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
     PrimaryActorTick.bCanEverTick = true;
 
@@ -272,39 +274,28 @@ void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Sprint()
 {
-    ANYPlayerStateStage* PS = ResolvePlayerState();
-    if (!PS || !PS->CanControlPawn())
+    // Local: input only. CMC carries the flag to the server inside each saved move.
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
+    if (!PS || PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
         return;
 
-    if (HasAuthority())
+    if (UNYCharacterMovementComponent* MoveComp = GetNYCharacterMovement())
     {
-        PS->SetSprinting(true);
-    }
-    else
-    {
-        Server_SetSprinting(true);
+        MoveComp->SetWantsToSprint(true);
     }
 }
 
 void ANYCharacterPlayer::StopSprint()
 {
-    if (HasAuthority())
+    if (UNYCharacterMovementComponent* MoveComp = GetNYCharacterMovement())
     {
-        if (PS_ref)
-            PS_ref->SetSprinting(false);
-    }
-    else
-    {
-        Server_SetSprinting(false);
+        MoveComp->SetWantsToSprint(false);
     }
 }
 
-void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
+UNYCharacterMovementComponent* ANYCharacterPlayer::GetNYCharacterMovement() const
 {
-    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
-    {
-        PS->SetSprinting(bSprint);
-    }
+    return Cast<UNYCharacterMovementComponent>(GetCharacterMovement());
 }
 
 void ANYCharacterPlayer::SwapWeaponSlots()
@@ -503,6 +494,9 @@ float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 void ANYCharacterPlayer::Die()
 {
     bIsDead = true;
+
+    // A key held through death would otherwise resume sprinting on revive without a fresh press.
+    StopSprint();
 
     GetCharacterMovement()->DisableMovement();
     GetCharacterMovement()->StopMovementImmediately();

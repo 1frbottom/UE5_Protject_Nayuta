@@ -18,6 +18,7 @@ class UInputAction;
 class UStaticMeshComponent;
 class UAnimMontage;
 class UNYWeaponComponent;
+class UNYCharacterMovementComponent;
 
 UCLASS()
 class PROJECTNAYUTA_API ANYCharacterPlayer : public ACharacter
@@ -25,7 +26,7 @@ class PROJECTNAYUTA_API ANYCharacterPlayer : public ACharacter
 	GENERATED_BODY()
 
 public:
-	ANYCharacterPlayer();
+	ANYCharacterPlayer(const FObjectInitializer& ObjectInitializer);
 
 	virtual void Tick(float DeltaTime) override;
 
@@ -94,8 +95,7 @@ protected:
 	void Sprint();
 	void StopSprint();
 
-	UFUNCTION(Server, Reliable)
-	void Server_SetSprinting(bool bSprint);
+	UNYCharacterMovementComponent* GetNYCharacterMovement() const;
 
 	// Jump
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
