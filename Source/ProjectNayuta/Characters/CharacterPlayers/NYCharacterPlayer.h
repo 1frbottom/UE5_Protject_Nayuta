@@ -149,24 +149,24 @@ protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Stat")
 	bool bIsDead = false;
 
-	/** Push player and nearby monsters apart when capsules overlap (requires Player-Monster Overlap in collision presets). */
+	/**
+	 * Resolves player-monster capsule overlap (requires Player-Monster Overlap in collision presets).
+	 * Monsters only shift their mesh, locally on every machine. The player is pushed through
+	 * movement input on the locally controlled side, so CMC predicts and replays it like any input.
+	 */
 	void ResolveMonsterSoftCollision();
 
 	/** Extra radius added to the overlap query beyond the player capsule. */
 	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
 	float MonsterSeparationQueryPadding = 10.0f;
 
-	/** Player share of depenetration while moving (monster gets the rest). */
-	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
-	float PlayerPushWeightWhileMoving = 0.25f;
+	/** Input added per fully-overlapped monster, scaled down by how shallow the overlap is. */
+	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation", meta = (ClampMin = "0.0"))
+	float SeparationInputStrength = 0.5f;
 
-	/** Player share of depenetration while idle (monster swarm can push the player). */
-	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
-	float PlayerPushWeightWhileIdle = 0.45f;
-
-	/** Cap total player displacement per frame to avoid spikes when many monsters overlap. */
-	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation")
-	float MaxPlayerSeparationPerTick = 8.0f;
+	/** Kept below 1 so full player input always out-pushes the horde: slowed, never blocked. */
+	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation", meta = (ClampMin = "0.0", ClampMax = "0.95"))
+	float MaxSeparationInput = 0.6f;
 
 // Hit
 protected:

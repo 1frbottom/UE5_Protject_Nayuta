@@ -68,6 +68,8 @@ void ANYMonsterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+    UpdateSeparationVisualOffset(DeltaTime);
+
 	if (CurrentHp <= 0.0f || !MovementComp)
 	{
 		return;
@@ -127,6 +129,18 @@ void ANYMonsterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
     DOREPLIFETIME(ANYMonsterBase, ActivationData);
     DOREPLIFETIME(ANYMonsterBase, CurrentHp);
+}
+
+void ANYMonsterBase::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+
+    // Not BeginPlay: on clients the first OnRep_ActivationData can run before it, and
+    // ClearHitState() would then restore the mesh to an uncaptured zero.
+    if (SkeletalMeshComp)
+    {
+        MeshBaseRelativeLocation = SkeletalMeshComp->GetRelativeLocation();
+    }
 }
 
 void ANYMonsterBase::BeginPlay()
@@ -534,6 +548,61 @@ void ANYMonsterBase::ClearHitState()
     {
         MovementComp->ResetMotion();
     }
+
+    ResetSeparationVisualOffset();
+}
+
+// Separation
+void ANYMonsterBase::RequestSeparationVisualOffset(const FVector& WorldOffset)
+{
+    // Several players can overlap one monster in the same frame.
+    if (WorldOffset.SizeSquared() > PendingVisualOffset.SizeSquared())
+    {
+        PendingVisualOffset = WorldOffset.GetClampedToMaxSize(MaxSeparationVisualOffset);
+    }
+}
+
+void ANYMonsterBase::UpdateSeparationVisualOffset(float DeltaTime)
+{
+    // Most of the horde is never touched; keep their per-frame cost at this one check.
+    if (PendingVisualOffset.IsNearlyZero() && CurrentVisualOffset.IsNearlyZero())
+    {
+        return;
+    }
+
+    CurrentVisualOffset = FMath::VInterpTo(CurrentVisualOffset, PendingVisualOffset, DeltaTime, SeparationVisualInterpSpeed);
+    PendingVisualOffset = FVector::ZeroVector;
+
+    if (CurrentVisualOffset.SizeSquared() < FMath::Square(0.1f))
+    {
+        CurrentVisualOffset = FVector::ZeroVector;
+    }
+
+    ApplySeparationVisualOffset();
+}
+
+void ANYMonsterBase::ResetSeparationVisualOffset()
+{
+    PendingVisualOffset = FVector::ZeroVector;
+
+    if (CurrentVisualOffset.IsZero())
+    {
+        return;
+    }
+
+    CurrentVisualOffset = FVector::ZeroVector;
+    ApplySeparationVisualOffset();
+}
+
+void ANYMonsterBase::ApplySeparationVisualOffset()
+{
+    if (!SkeletalMeshComp)
+    {
+        return;
+    }
+
+    // The offset is world space; the mesh lives in the rotating actor's space.
+    SkeletalMeshComp->SetRelativeLocation(MeshBaseRelativeLocation + GetActorQuat().UnrotateVector(CurrentVisualOffset));
 }
 
 // Attack

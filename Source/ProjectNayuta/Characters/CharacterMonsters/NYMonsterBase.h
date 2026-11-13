@@ -52,6 +52,8 @@ public:
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+    virtual void PostInitializeComponents() override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -308,5 +310,40 @@ private:
 
     /** Locally cached HP so OnRep_CurrentHp can tell a hit apart from a pool refill. */
     float LastObservedHp = 0.0f;
+
+
+// Separation
+public:
+    /**
+     * Presentation only, called on every machine by players overlapping this monster.
+     * Shifts the mesh, never the capsule: each machine sees players at slightly different
+     * positions, so moving the actor here would let the local simulations drift apart.
+     * Requests are a per-frame target, not accumulated; the deepest overlap of the frame wins.
+     */
+    void RequestSeparationVisualOffset(const FVector& WorldOffset);
+
+protected:
+    /** Longest distance (cm) the mesh may be shifted away from its capsule. */
+    UPROPERTY(EditAnywhere, Category = "Separation")
+    float MaxSeparationVisualOffset = 50.0f;
+
+    /** How fast the mesh follows the requested offset, and eases back once overlaps end. */
+    UPROPERTY(EditAnywhere, Category = "Separation")
+    float SeparationVisualInterpSpeed = 15.0f;
+
+private:
+    /** Eases the mesh toward this frame's request. Skips the transform update while at rest. */
+    void UpdateSeparationVisualOffset(float DeltaTime);
+
+    /** Snaps the mesh back onto the capsule so a pooled monster never inherits the shift. */
+    void ResetSeparationVisualOffset();
+
+    void ApplySeparationVisualOffset();
+
+    /** Mesh relative location authored in Blueprint, captured before any offset is applied. */
+    FVector MeshBaseRelativeLocation = FVector::ZeroVector;
+
+    FVector CurrentVisualOffset = FVector::ZeroVector;
+    FVector PendingVisualOffset = FVector::ZeroVector;
 
 };

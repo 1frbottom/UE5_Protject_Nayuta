@@ -579,11 +579,7 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
         return;
 
     const FVector PlayerLocation = GetActorLocation();
-    const float PlayerPushWeight = GetLastMovementInputVector().SizeSquared2D() > KINDA_SMALL_NUMBER
-        ? PlayerPushWeightWhileMoving
-        : PlayerPushWeightWhileIdle;
-
-    FVector AccumulatedPlayerOffset = FVector::ZeroVector;
+    FVector AccumulatedSeparationInput = FVector::ZeroVector;
 
     for (const FOverlapResult& Result : OverlapResults)
     {
@@ -609,7 +605,8 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
 
         if (DistSq < KINDA_SMALL_NUMBER)
         {
-            PushDir = FVector(FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-1.0f, 1.0f), 0.0f).GetSafeNormal();
+            // A fixed fallback; a per-frame random direction makes the mesh shake while stacked.
+            PushDir = GetActorForwardVector().GetSafeNormal2D();
         }
         else
         {
@@ -618,27 +615,18 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
             Penetration = MinDist - Dist;
         }
 
-        const float MonsterPushWeight = 1.0f - PlayerPushWeight;
-        const FVector MonsterOffset = PushDir * Penetration * MonsterPushWeight;
-        const FVector PlayerOffset = -PushDir * Penetration * PlayerPushWeight;
+        // Only the mesh moves: monster positions are simulated per machine, not replicated.
+        Monster->RequestSeparationVisualOffset(PushDir * Penetration);
 
-        Monster->AddActorWorldOffset(MonsterOffset, true);
-        AccumulatedPlayerOffset += PlayerOffset;
+        // 0 at first contact, 1 when fully stacked, so the push grows with the overlap.
+        AccumulatedSeparationInput -= PushDir * (Penetration / MinDist) * SeparationInputStrength;
     }
 
-    if (!AccumulatedPlayerOffset.IsNearlyZero() && HasAuthority())
+    // Input, not an offset: CMC predicts it on the owning client and the server replays the same
+    // acceleration. Moving the capsule directly on the server would fight that prediction.
+    if (IsLocallyControlled() && !AccumulatedSeparationInput.IsNearlyZero())
     {
-        if (MaxPlayerSeparationPerTick > 0.0f)
-        {
-            AccumulatedPlayerOffset = AccumulatedPlayerOffset.GetClampedToMaxSize(MaxPlayerSeparationPerTick);
-        }
-
-        FHitResult Hit;
-        GetCharacterMovement()->SafeMoveUpdatedComponent(
-            AccumulatedPlayerOffset,
-            GetActorRotation(),
-            true,
-            Hit);
+        AddMovementInput(AccumulatedSeparationInput.GetClampedToMaxSize(MaxSeparationInput));
     }
 }
 
