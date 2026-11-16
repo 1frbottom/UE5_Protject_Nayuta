@@ -137,11 +137,7 @@ public:
 
 	void AddMoveSpeed(float InMoveSpeed);
 
-	static constexpr float SprintSpeedBonus = 250.f;
-	void SetSprinting(bool bSprint);
-	FORCEINLINE bool IsSprinting() const { return bIsSprinting; }
-
-	/** MoveSpeed + Sprint Bonus Reflected to Pawn CMC */
+	/** Writes MoveSpeed into the pawn's MaxWalkSpeed. Sprint is added on top by the CMC itself. */
 	void ApplyMoveSpeedToPawn();
 
 protected:
@@ -150,12 +146,6 @@ protected:
 
 	UFUNCTION()
 	void OnRep_MoveSpeed();
-
-	UPROPERTY(ReplicatedUsing = OnRep_bIsSprinting, BlueprintReadOnly, Category = "Stat")
-	bool bIsSprinting = false;
-
-	UFUNCTION()
-	void OnRep_bIsSprinting();
 
 
 // Reward

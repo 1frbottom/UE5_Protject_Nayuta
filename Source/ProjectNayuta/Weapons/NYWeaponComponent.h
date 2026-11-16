@@ -98,6 +98,9 @@ public:
 	/** Server: start/stop cooldown-gated fire while the owner holds attack. */
 	void SetWantsToFire(bool bNewWantsToFire);
 
+	/** Server: cancel held fire and any attack waiting for its montage commit point. */
+	void ResetFireState();
+
 	/** Server: flattened aim used when the next attack spawns. */
 	void SetAimDirection(const FVector& NewAimDir);
 

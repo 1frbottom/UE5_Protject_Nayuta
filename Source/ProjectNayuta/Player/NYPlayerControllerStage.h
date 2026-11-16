@@ -11,6 +11,7 @@
 
 class UInputAction;
 class UInputMappingContext;
+enum class ENYPlayerPhase : uint8;
 
 UENUM()
 enum class ENYInputConfig : uint8
@@ -43,6 +44,9 @@ public:
     // Phase
     UFUNCTION(BlueprintCallable, Category = "UI")
     void HandleGamePhaseChanged(ENYGamePhase NewPhase);
+
+    /** Local: while the shared game phase is Rewarding, only Ready players regain gameplay input. */
+    void HandleRewardPlayerPhaseChanged(ENYPlayerPhase NewPhase);
 
     UFUNCTION(BlueprintImplementableEvent, Category = "UI")
     void UpdateExpUI(int32 CurrentExp, int32 MaxExpValue, int32 PlayerLevel);

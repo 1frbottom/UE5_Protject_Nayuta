@@ -30,7 +30,6 @@ void ANYPlayerStateStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ANYPlayerStateStage, MaxHP);
 
     DOREPLIFETIME(ANYPlayerStateStage, MoveSpeed);
-    DOREPLIFETIME(ANYPlayerStateStage, bIsSprinting);
 
     DOREPLIFETIME_CONDITION(ANYPlayerStateStage, PendingRewardOffers, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(ANYPlayerStateStage, bHasSelectedReward, COND_OwnerOnly);
@@ -94,8 +93,10 @@ void ANYPlayerStateStage::OnRep_CurrPhase()
         PendingRewardOffers.Empty();
     }
 
-
-
+    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    {
+        PC->HandleRewardPlayerPhaseChanged(CurrPhase);
+    }
 }
 
 
@@ -375,42 +376,22 @@ void ANYPlayerStateStage::AddMoveSpeed(float InMoveSpeed)
 
     MoveSpeed += InMoveSpeed;
     OnRep_MoveSpeed();
-}
 
-void ANYPlayerStateStage::SetSprinting(bool bSprint)
-{
-    if (!HasAuthority())
-        return;
-    if (CurrPhase != ENYPlayerPhase::Alive)
-        return;
-    if (bIsSprinting == bSprint)
-        return;
-    bIsSprinting = bSprint;
-    OnRep_bIsSprinting(); // 리슨 서버 즉시 반영
+    // PlayerState updates at 1 Hz by default; until this arrives the owning client is corrected
+    // at the old speed, so push it out now instead of waiting for the next slot.
+    ForceNetUpdate();
 }
 
 void ANYPlayerStateStage::ApplyMoveSpeedToPawn()
 {
-    APawn* Pawn_ref = GetPawn();
-    if (!Pawn_ref)
-        return;
-    ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(Pawn_ref);
+    ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(GetPawn());
     if (!Character)
         return;
-    float EffectiveSpeed = MoveSpeed;
-    if (bIsSprinting && CurrPhase == ENYPlayerPhase::Alive)
-    {
-        EffectiveSpeed += SprintSpeedBonus;
-    }
-    Character->GetCharacterMovement()->MaxWalkSpeed = EffectiveSpeed;
+
+    Character->GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
 }
 
 void ANYPlayerStateStage::OnRep_MoveSpeed()
-{
-    ApplyMoveSpeedToPawn();
-}
-
-void ANYPlayerStateStage::OnRep_bIsSprinting()
 {
     ApplyMoveSpeedToPawn();
 }

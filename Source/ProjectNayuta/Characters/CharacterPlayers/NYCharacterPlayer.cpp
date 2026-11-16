@@ -21,12 +21,14 @@
 
 #include "Game/NYGameModeStage.h"
 #include "Characters/CharacterMonsters/NYMonsterBase.h"
+#include "Characters/CharacterPlayers/NYCharacterMovementComponent.h"
 
 #include "Player/NYPlayerControllerBase.h"
 #include "Player/NYPlayerStateStage.h"
 
 #include "Weapons/NYWeaponComponent.h"
 #include "Weapons/NYWeaponDefinition.h"
+#include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -34,7 +36,8 @@
 
 
 
-ANYCharacterPlayer::ANYCharacterPlayer()
+ANYCharacterPlayer::ANYCharacterPlayer(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UNYCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
     PrimaryActorTick.bCanEverTick = true;
 
@@ -272,39 +275,28 @@ void ANYCharacterPlayer::Move(const FInputActionValue& Value)
 
 void ANYCharacterPlayer::Sprint()
 {
-    ANYPlayerStateStage* PS = ResolvePlayerState();
+    // Local: input only. CMC carries the flag to the server inside each saved move.
+    const ANYPlayerStateStage* PS = ResolvePlayerState();
     if (!PS || !PS->CanControlPawn())
         return;
 
-    if (HasAuthority())
+    if (UNYCharacterMovementComponent* MoveComp = GetNYCharacterMovement())
     {
-        PS->SetSprinting(true);
-    }
-    else
-    {
-        Server_SetSprinting(true);
+        MoveComp->SetWantsToSprint(true);
     }
 }
 
 void ANYCharacterPlayer::StopSprint()
 {
-    if (HasAuthority())
+    if (UNYCharacterMovementComponent* MoveComp = GetNYCharacterMovement())
     {
-        if (PS_ref)
-            PS_ref->SetSprinting(false);
-    }
-    else
-    {
-        Server_SetSprinting(false);
+        MoveComp->SetWantsToSprint(false);
     }
 }
 
-void ANYCharacterPlayer::Server_SetSprinting_Implementation(bool bSprint)
+UNYCharacterMovementComponent* ANYCharacterPlayer::GetNYCharacterMovement() const
 {
-    if (ANYPlayerStateStage* PS = GetPlayerState<ANYPlayerStateStage>())
-    {
-        PS->SetSprinting(bSprint);
-    }
+    return Cast<UNYCharacterMovementComponent>(GetCharacterMovement());
 }
 
 void ANYCharacterPlayer::SwapWeaponSlots()
@@ -479,9 +471,14 @@ FVector ANYCharacterPlayer::GetLookAimDirection() const
 
 
 // Stat
+// Server
 float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     if (!HasAuthority() || !PS_ref)
+        return 0.0f;
+
+    // No friendly fire between players.
+    if (Cast<ANYAttackPlayerBase>(DamageCauser))
         return 0.0f;
 
     PS_ref->ApplyDamage(DamageAmount);
@@ -503,6 +500,9 @@ float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 void ANYCharacterPlayer::Die()
 {
     bIsDead = true;
+
+    // A key held through death would otherwise resume sprinting on revive without a fresh press.
+    StopSprint();
 
     GetCharacterMovement()->DisableMovement();
     GetCharacterMovement()->StopMovementImmediately();
@@ -545,16 +545,16 @@ void ANYCharacterPlayer::Revive()
 
 void ANYCharacterPlayer::ResolveMonsterSoftCollision()
 {
+    UWorld* World = GetWorld();
+    if (!World)
+        return;
+
     const ANYPlayerStateStage* PS = ResolvePlayerState();
     if (!PS || !PS->CanControlPawn())
         return;
 
     const UCapsuleComponent* PlayerCapsule = GetCapsuleComponent();
     if (!PlayerCapsule || !PlayerCapsule->IsCollisionEnabled())
-        return;
-
-    UWorld* World = GetWorld();
-    if (!World)
         return;
 
     const float PlayerRadius = PlayerCapsule->GetScaledCapsuleRadius();
@@ -579,11 +579,7 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
         return;
 
     const FVector PlayerLocation = GetActorLocation();
-    const float PlayerPushWeight = GetLastMovementInputVector().SizeSquared2D() > KINDA_SMALL_NUMBER
-        ? PlayerPushWeightWhileMoving
-        : PlayerPushWeightWhileIdle;
-
-    FVector AccumulatedPlayerOffset = FVector::ZeroVector;
+    FVector AccumulatedSeparationInput = FVector::ZeroVector;
 
     for (const FOverlapResult& Result : OverlapResults)
     {
@@ -609,7 +605,8 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
 
         if (DistSq < KINDA_SMALL_NUMBER)
         {
-            PushDir = FVector(FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-1.0f, 1.0f), 0.0f).GetSafeNormal();
+            // A fixed fallback; a per-frame random direction makes the mesh shake while stacked.
+            PushDir = GetActorForwardVector().GetSafeNormal2D();
         }
         else
         {
@@ -618,27 +615,18 @@ void ANYCharacterPlayer::ResolveMonsterSoftCollision()
             Penetration = MinDist - Dist;
         }
 
-        const float MonsterPushWeight = 1.0f - PlayerPushWeight;
-        const FVector MonsterOffset = PushDir * Penetration * MonsterPushWeight;
-        const FVector PlayerOffset = -PushDir * Penetration * PlayerPushWeight;
+        // Only the mesh moves: monster positions are simulated per machine, not replicated.
+        Monster->RequestSeparationVisualOffset(PushDir * Penetration);
 
-        Monster->AddActorWorldOffset(MonsterOffset, true);
-        AccumulatedPlayerOffset += PlayerOffset;
+        // 0 at first contact, 1 when fully stacked, so the push grows with the overlap.
+        AccumulatedSeparationInput -= PushDir * (Penetration / MinDist) * SeparationInputStrength;
     }
 
-    if (!AccumulatedPlayerOffset.IsNearlyZero() && HasAuthority())
+    // Input, not an offset: CMC predicts it on the owning client and the server replays the same
+    // acceleration. Moving the capsule directly on the server would fight that prediction.
+    if (IsLocallyControlled() && !AccumulatedSeparationInput.IsNearlyZero())
     {
-        if (MaxPlayerSeparationPerTick > 0.0f)
-        {
-            AccumulatedPlayerOffset = AccumulatedPlayerOffset.GetClampedToMaxSize(MaxPlayerSeparationPerTick);
-        }
-
-        FHitResult Hit;
-        GetCharacterMovement()->SafeMoveUpdatedComponent(
-            AccumulatedPlayerOffset,
-            GetActorRotation(),
-            true,
-            Hit);
+        AddMovementInput(AccumulatedSeparationInput.GetClampedToMaxSize(MaxSeparationInput));
     }
 }
 

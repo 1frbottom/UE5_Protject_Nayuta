@@ -480,6 +480,15 @@ void ANYGameModeStage::StartRewardPhase()
 			continue;
 		}
 
+		if (ANYCharacterPlayer* Character = Cast<ANYCharacterPlayer>(StagePS->GetPawn()))
+		{
+			if (UNYWeaponComponent* WeaponComp = Character->GetWeaponComponent())
+			{
+				// Server: reward selection must not inherit a held attack or pending commit.
+				WeaponComp->ResetFireState();
+			}
+		}
+
 		// Died before the wave ended — skip reward UI and count as ready.
 		if (StagePS->GetPlayerPhase() == ENYPlayerPhase::Dead)
 		{
