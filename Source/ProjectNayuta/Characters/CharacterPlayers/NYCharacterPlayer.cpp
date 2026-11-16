@@ -28,6 +28,7 @@
 
 #include "Weapons/NYWeaponComponent.h"
 #include "Weapons/NYWeaponDefinition.h"
+#include "Weapons/PlayerWeapons/NYAttackPlayerBase.h"
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -470,9 +471,14 @@ FVector ANYCharacterPlayer::GetLookAimDirection() const
 
 
 // Stat
+// Server
 float ANYCharacterPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     if (!HasAuthority() || !PS_ref)
+        return 0.0f;
+
+    // No friendly fire between players.
+    if (Cast<ANYAttackPlayerBase>(DamageCauser))
         return 0.0f;
 
     PS_ref->ApplyDamage(DamageAmount);
@@ -539,16 +545,16 @@ void ANYCharacterPlayer::Revive()
 
 void ANYCharacterPlayer::ResolveMonsterSoftCollision()
 {
+    UWorld* World = GetWorld();
+    if (!World)
+        return;
+
     const ANYPlayerStateStage* PS = ResolvePlayerState();
     if (!PS || !PS->CanControlPawn())
         return;
 
     const UCapsuleComponent* PlayerCapsule = GetCapsuleComponent();
     if (!PlayerCapsule || !PlayerCapsule->IsCollisionEnabled())
-        return;
-
-    UWorld* World = GetWorld();
-    if (!World)
         return;
 
     const float PlayerRadius = PlayerCapsule->GetScaledCapsuleRadius();

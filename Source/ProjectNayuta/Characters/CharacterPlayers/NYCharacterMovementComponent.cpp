@@ -25,6 +25,7 @@ public:
 		{
 			Result |= FLAG_Custom_0;
 		}
+
 		return Result;
 	}
 
@@ -35,6 +36,7 @@ public:
 		{
 			return false;
 		}
+
 		return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 	}
 
@@ -109,7 +111,6 @@ void UNYCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 }
-
 
 // Sprint
 void UNYCharacterMovementComponent::SetWantsToSprint(bool bInWantsToSprint)

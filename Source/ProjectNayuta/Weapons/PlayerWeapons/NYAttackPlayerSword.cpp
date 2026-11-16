@@ -90,11 +90,14 @@ void ANYAttackPlayerSword::ApplyMeleeDamageInRange()
 		CollisionParams.AddIgnoredActor(InstigatorActor);
 	}
 
-	World->OverlapMultiByChannel(
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_MONSTER);
+
+	World->OverlapMultiByObjectType(
 		OverlapResults,
 		Origin,
 		FQuat::Identity,
-		ECC_PLAYERATTACK,
+		ObjectQueryParams,
 		FCollisionShape::MakeSphere(CurrentRange),
 		CollisionParams);
 
