@@ -43,6 +43,13 @@ void ANYPlayerControllerStage::OnPossess(APawn* InPawn)
         switch (GS->GetGamePhase())
         {
         case ENYGamePhase::Rewarding:
+        {
+            const ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
+            Config = PS && PS->GetPlayerPhase() == ENYPlayerPhase::Ready
+                ? ENYInputConfig::Gameplay
+                : ENYInputConfig::ModalUI;
+            break;
+        }
         case ENYGamePhase::GameOver:
         case ENYGamePhase::GameClear:
             Config = ENYInputConfig::ModalUI;
@@ -126,8 +133,12 @@ void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
         ApplyInputConfig(ENYInputConfig::Gameplay);
         break;
     case ENYGamePhase::Rewarding:
-        ApplyInputConfig(ENYInputConfig::ModalUI);
+    {
+        const ANYPlayerStateStage* PS = Cast<ANYPlayerStateStage>(PlayerState);
+        const bool bRewardSelected = PS && PS->GetPlayerPhase() == ENYPlayerPhase::Ready;
+        ApplyInputConfig(bRewardSelected ? ENYInputConfig::Gameplay : ENYInputConfig::ModalUI);
         break;
+    }
     case ENYGamePhase::GameOver:
         ApplyInputConfig(ENYInputConfig::ModalUI);
         ShowGameOverUI();
@@ -154,6 +165,24 @@ void ANYPlayerControllerStage::HandleGamePhaseChanged(ENYGamePhase NewPhase)
     default:
         break;
     }
+}
+
+void ANYPlayerControllerStage::HandleRewardPlayerPhaseChanged(ENYPlayerPhase NewPhase)
+{
+    if (!IsLocalPlayerController())
+    {
+        return;
+    }
+
+    ANYGameStateStage* GS = GetWorld() ? GetWorld()->GetGameState<ANYGameStateStage>() : nullptr;
+    if (!GS || GS->GetGamePhase() != ENYGamePhase::Rewarding)
+    {
+        return;
+    }
+
+    ApplyInputConfig(NewPhase == ENYPlayerPhase::Ready
+        ? ENYInputConfig::Gameplay
+        : ENYInputConfig::ModalUI);
 }
 
 void ANYPlayerControllerStage::TogglePause()

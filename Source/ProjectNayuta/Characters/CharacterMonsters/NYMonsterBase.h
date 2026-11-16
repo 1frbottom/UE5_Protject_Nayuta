@@ -325,7 +325,7 @@ public:
 protected:
     /** Longest distance (cm) the mesh may be shifted away from its capsule. */
     UPROPERTY(EditAnywhere, Category = "Separation")
-    float MaxSeparationVisualOffset = 50.0f;
+    float MaxSeparationVisualOffset = 25.0f;
 
     /** How fast the mesh follows the requested offset, and eases back once overlaps end. */
     UPROPERTY(EditAnywhere, Category = "Separation")

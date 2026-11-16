@@ -93,8 +93,10 @@ void ANYPlayerStateStage::OnRep_CurrPhase()
         PendingRewardOffers.Empty();
     }
 
-
-
+    if (ANYPlayerControllerStage* PC = Cast<ANYPlayerControllerStage>(GetPlayerController()))
+    {
+        PC->HandleRewardPlayerPhaseChanged(CurrPhase);
+    }
 }
 
 

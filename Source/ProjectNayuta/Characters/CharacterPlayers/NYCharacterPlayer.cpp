@@ -277,7 +277,7 @@ void ANYCharacterPlayer::Sprint()
 {
     // Local: input only. CMC carries the flag to the server inside each saved move.
     const ANYPlayerStateStage* PS = ResolvePlayerState();
-    if (!PS || PS->GetPlayerPhase() != ENYPlayerPhase::Alive)
+    if (!PS || !PS->CanControlPawn())
         return;
 
     if (UNYCharacterMovementComponent* MoveComp = GetNYCharacterMovement())

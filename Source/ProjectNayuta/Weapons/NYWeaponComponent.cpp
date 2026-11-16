@@ -238,6 +238,23 @@ void UNYWeaponComponent::SetWantsToFire(bool bNewWantsToFire)
 	StartFireTimerIfNeeded(true);
 }
 
+void UNYWeaponComponent::ResetFireState()
+{
+	// Server
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	bWantsToFire = false;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AttackTimer);
+		World->GetTimerManager().ClearTimer(AttackCommitTimerHandle);
+	}
+}
+
 void UNYWeaponComponent::SetAimDirection(const FVector& NewAimDir)
 {
 	// Server

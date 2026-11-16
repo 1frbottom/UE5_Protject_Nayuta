@@ -166,7 +166,7 @@ protected:
 
 	/** Kept below 1 so full player input always out-pushes the horde: slowed, never blocked. */
 	UPROPERTY(EditDefaultsOnly, Category = "Collision|Separation", meta = (ClampMin = "0.0", ClampMax = "0.95"))
-	float MaxSeparationInput = 0.6f;
+	float MaxSeparationInput = 0.8f;
 
 // Hit
 protected:
