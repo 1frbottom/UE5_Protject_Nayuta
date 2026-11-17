@@ -15,7 +15,7 @@
 
 * **개발 기간 :** 2026.05 ~ 진행중
 * **개발 인원 :** 1명
-* **엔진 및 언어 :** Unreal Engine 5.4 / C++ / Steam OSS
+* **사용 기술 :** Unreal Engine 5.4 / C++ / Steam OSS
 * **플랫폼 :** PC (Windows)
 
 <br>
@@ -24,17 +24,16 @@
 
 ### 1. 대규모 몬스터 처리
 
-* [활성화, 시드복제](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L333-L466)
-* [전용 이동컴포넌트](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterMovementComponent.cpp#L43-L169)
 * [오브젝트 풀](Source/ProjectNayuta/Monsters/NYMonsterPoolComponent.cpp#L14-L91)
-* [소프트 콜리전 (플레이어 이동 입력)](Source/ProjectNayuta/Characters/CharacterPlayers/NYCharacterPlayer.cpp#L546-L631)
-* [소프트 콜리전 (몬스터 메시 오프셋)](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L556-L606)
+* [활성화, 시드 복제](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L333-L466)
+* [전용 이동 컴포넌트](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterMovementComponent.cpp#L43-L169)
+* 소프트 콜리전 ([플레이어](Source/ProjectNayuta/Characters/CharacterPlayers/NYCharacterPlayer.cpp#L546-L631), [몬스터](Source/ProjectNayuta/Characters/CharacterMonsters/NYMonsterBase.cpp#L556-L606))
 
 ### 2. 서버 권위 멀티플레이
 
 * [서버 공격 생성](Source/ProjectNayuta/Weapons/NYWeaponComponent.cpp#L358-L464)
+* [보상 선택 서버 검증](Source/ProjectNayuta/Player/NYPlayerStateStage.cpp#L401-L499)
 * [GameState 페이즈 복제](Source/ProjectNayuta/Game/NYGameStateStage.cpp#L26-L59)
-* [보상선택 서버 검증](Source/ProjectNayuta/Player/NYPlayerStateStage.cpp#L401-L499)
 * [스프린트 CMC 예측](Source/ProjectNayuta/Characters/CharacterPlayers/NYCharacterMovementComponent.cpp#L10-L113)
 
 <br>
