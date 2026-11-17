@@ -97,3 +97,8 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Claude
+CLAUDE.md
+CLAUDE.local.md
+.claude/
